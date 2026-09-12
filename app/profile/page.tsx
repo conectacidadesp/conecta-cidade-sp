@@ -11,6 +11,7 @@ interface Ad {
   image_url: string | null;
   city: string;
   description?: string;
+  is_hidden?: boolean;
 }
 
 const FONT_OPTIONS = [
@@ -28,6 +29,7 @@ const THEME_OPTIONS = [
 ];
 
 export default function ProfileDashboard() {
+  const [userType, setUserType] = useState<"store" | "client">("store");
   const [activeTab, setActiveTab] = useState<"perfil" | "vitrine" | "anuncios">("perfil");
   
   // Dados Básicos da Loja
@@ -73,6 +75,15 @@ export default function ProfileDashboard() {
         .eq("id", user.id)
         .single();
 
+      const isPhoneUser = user.email?.includes("phone") || user.phone || profileData?.user_type === "client";
+      const type = isPhoneUser ? "client" : (profileData?.user_type || "store");
+      
+      setUserType(type);
+
+      if (type === "client") {
+        setActiveTab("anuncios");
+      }
+
       if (profileData) {
         setStoreName(profileData.store_name || "");
         setCity(profileData.city || "");
@@ -88,7 +99,7 @@ export default function ProfileDashboard() {
       setLoadingAds(true);
       const { data: adsData } = await supabase
         .from("ads")
-        .select("id, title, price, category, image_url, city, description")
+        .select("id, title, price, category, image_url, city, description, is_hidden")
         .eq("user_id", user.id);
 
       if (adsData) {
@@ -107,7 +118,7 @@ export default function ProfileDashboard() {
     if (!user) return;
 
     if (!city) {
-      alert("Por favor, selecione a cidade da sua loja!");
+      alert("Por favor, selecione a cidade!");
       return;
     }
 
@@ -115,7 +126,6 @@ export default function ProfileDashboard() {
     let uploadedLogoUrl = currentLogoUrl || "";
     let uploadedBannerUrl = bannerUrl || "";
 
-    // Upload do Logotipo
     if (logoFile) {
       const fileExt = logoFile.name.split('.').pop();
       const fileName = `${user.id}-logo-${Math.random()}.${fileExt}`;
@@ -131,7 +141,6 @@ export default function ProfileDashboard() {
       }
     }
 
-    // Upload da Capa/Banner
     if (bannerFile) {
       const fileExt = bannerFile.name.split('.').pop();
       const fileName = `${user.id}-banner-${Math.random()}.${fileExt}`;
@@ -169,7 +178,7 @@ export default function ProfileDashboard() {
     } else {
       setCurrentLogoUrl(uploadedLogoUrl);
       setBannerUrl(uploadedBannerUrl);
-      alert("Configurações atualizadas com sucesso!");
+      alert("Informações atualizadas com sucesso!");
     }
   };
 
@@ -195,8 +204,36 @@ export default function ProfileDashboard() {
     }
   };
 
+  // Alterna entre oculto e visível para Lojas
+  const handleToggleHideAd = async (adId: string, currentStatus: boolean | undefined) => {
+    const nextStatus = !currentStatus;
+    const { error } = await supabase
+      .from("ads")
+      .update({ is_hidden: nextStatus })
+      .eq("id", adId);
+
+    if (!error) {
+      setMyAds(myAds.map(ad => ad.id === adId ? { ...ad, is_hidden: nextStatus } : ad));
+    } else {
+      alert("Erro ao atualizar o status do produto: " + error.message);
+    }
+  };
+
+  const handleMarkAsSold = async (adId: string, adTitle: string) => {
+    if (!window.confirm(`Marcar o anúncio "${adTitle}" como Vendido?`)) return;
+
+    const { error } = await supabase.from("ads").delete().eq("id", adId);
+
+    if (!error) {
+      setMyAds(myAds.filter(ad => ad.id !== adId));
+      alert("Anúncio marcado como vendido e removido com sucesso!");
+    } else {
+      alert("Erro ao atualizar anúncio: " + error.message);
+    }
+  };
+
   const handleDeleteAd = async (adId: string, adTitle: string) => {
-    if (!window.confirm(`Excluir o anúncio "${adTitle}"?`)) return;
+    if (!window.confirm(`Excluir permanentemente o anúncio "${adTitle}"?`)) return;
 
     const { error } = await supabase.from("ads").delete().eq("id", adId);
 
@@ -210,13 +247,12 @@ export default function ProfileDashboard() {
   const activeFontFamily = FONT_OPTIONS.find(f => f.id === fontStyle)?.family || "sans-serif";
 
   if (fetching) {
-    return <p style={{ textAlign: "center", padding: "60px", color: "#64748B", fontFamily: "sans-serif" }}>Carregando Painel de Controle...</p>;
+    return <p style={{ textAlign: "center", padding: "60px", color: "#64748B", fontFamily: "sans-serif" }}>Carregando Painel...</p>;
   }
 
   return (
     <main style={{ padding: "20px 10px", maxWidth: 1100, margin: "0 auto", fontFamily: "sans-serif", backgroundColor: "#F8FAFC", minHeight: "100vh" }}>
       
-      {/* Botão de Retorno e Ações Rápidas */}
       <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 20 }}>
         <button 
           onClick={() => window.location.href = "/"}
@@ -225,7 +261,7 @@ export default function ProfileDashboard() {
           {"<"} Voltar para o Início
         </button>
 
-        {storeName && (
+        {userType === "store" && storeName && (
           <button
             onClick={() => window.open(`/shop/${user?.id}`, "_blank")}
             style={{ padding: "8px 14px", backgroundColor: activeThemeHex, color: "#fff", border: "none", borderRadius: 6, fontWeight: "bold", cursor: "pointer", fontSize: 13 }}
@@ -235,62 +271,65 @@ export default function ProfileDashboard() {
         )}
       </div>
 
-      {/* Caixa Principal */}
       <div style={{ border: "1px solid #E2E8F0", borderRadius: 12, backgroundColor: "#fff", boxShadow: "0 4px 12px rgba(0,0,0,0.05)", overflow: "hidden" }}>
         
-        {/* Navegação por Abas */}
-        <div style={{ display: "flex", borderBottom: "1px solid #E2E8F0", backgroundColor: "#F1F5F9" }}>
-          <button
-            onClick={() => setActiveTab("perfil")}
-            style={{
-              flex: 1, padding: "16px", border: "none",
-              background: activeTab === "perfil" ? "#fff" : "none",
-              color: activeTab === "perfil" ? activeThemeHex : "#64748B",
-              fontWeight: "bold", fontSize: "14px", cursor: "pointer",
-              borderBottom: activeTab === "perfil" ? `3px solid ${activeThemeHex}` : "none"
-            }}
-          >
-            📋 Dados da Loja
-          </button>
-          
-          <button
-            onClick={() => setActiveTab("vitrine")}
-            style={{
-              flex: 1, padding: "16px", border: "none",
-              background: activeTab === "vitrine" ? "#fff" : "none",
-              color: activeTab === "vitrine" ? activeThemeHex : "#64748B",
-              fontWeight: "bold", fontSize: "14px", cursor: "pointer",
-              borderBottom: activeTab === "vitrine" ? `3px solid ${activeThemeHex}` : "none"
-            }}
-          >
-            🎨 Personalizar Vitrine
-          </button>
+        {userType === "store" ? (
+          <div style={{ display: "flex", borderBottom: "1px solid #E2E8F0", backgroundColor: "#F1F5F9" }}>
+            <button
+              onClick={() => setActiveTab("perfil")}
+              style={{
+                flex: 1, padding: "16px", border: "none",
+                background: activeTab === "perfil" ? "#fff" : "none",
+                color: activeTab === "perfil" ? activeThemeHex : "#64748B",
+                fontWeight: "bold", fontSize: "14px", cursor: "pointer",
+                borderBottom: activeTab === "perfil" ? `3px solid ${activeThemeHex}` : "none"
+              }}
+            >
+              📋 Dados da Loja
+            </button>
+            
+            <button
+              onClick={() => setActiveTab("vitrine")}
+              style={{
+                flex: 1, padding: "16px", border: "none",
+                background: activeTab === "vitrine" ? "#fff" : "none",
+                color: activeTab === "vitrine" ? activeThemeHex : "#64748B",
+                fontWeight: "bold", fontSize: "14px", cursor: "pointer",
+                borderBottom: activeTab === "vitrine" ? `3px solid ${activeThemeHex}` : "none"
+              }}
+            >
+              🎨 Personalizar Vitrine
+            </button>
 
-          <button
-            onClick={() => setActiveTab("anuncios")}
-            style={{
-              flex: 1, padding: "16px", border: "none",
-              background: activeTab === "anuncios" ? "#fff" : "none",
-              color: activeTab === "anuncios" ? activeThemeHex : "#64748B",
-              fontWeight: "bold", fontSize: "14px", cursor: "pointer",
-              borderBottom: activeTab === "anuncios" ? `3px solid ${activeThemeHex}` : "none"
-            }}
-          >
-            📦 Meus Anúncios ({myAds.length})
-          </button>
-        </div>
+            <button
+              onClick={() => setActiveTab("anuncios")}
+              style={{
+                flex: 1, padding: "16px", border: "none",
+                background: activeTab === "anuncios" ? "#fff" : "none",
+                color: activeTab === "anuncios" ? activeThemeHex : "#64748B",
+                fontWeight: "bold", fontSize: "14px", cursor: "pointer",
+                borderBottom: activeTab === "anuncios" ? `3px solid ${activeThemeHex}` : "none"
+              }}
+            >
+              📦 Meus Anúncios ({myAds.length})
+            </button>
+          </div>
+        ) : (
+          <div style={{ padding: "16px 25px", borderBottom: "1px solid #E2E8F0", backgroundColor: "#F1F5F9" }}>
+            <h2 style={{ margin: 0, fontSize: 18, color: "#1E293B" }}>Painel do Anunciante</h2>
+          </div>
+        )}
 
         <div style={{ padding: 25 }}>
 
-          {/* ABA 1: DADOS DA LOJA */}
-          {activeTab === "perfil" && (
+          {userType === "store" && activeTab === "perfil" && (
             <form onSubmit={handleSaveProfile} style={{ display: "flex", flexDirection: "column", gap: 18, maxWidth: 600 }}>
               <h2 style={{ fontSize: 20, margin: 0, fontWeight: "bold", color: "#1E293B" }}>Identidade do Comércio</h2>
               
               <div>
                 <label style={{ display: "block", fontSize: 13, fontWeight: "bold", marginBottom: 6 }}>Nome Fantasia:</label>
                 <input 
-                  placeholder="Ex: Bolso Forte" 
+                  placeholder="Ex: Minha Loja" 
                   value={storeName} 
                   onChange={(e) => setStoreName(e.target.value)} 
                   required 
@@ -308,11 +347,6 @@ export default function ProfileDashboard() {
                   <option value="marketplace">🛍️ Loja / Marketplace (Pergunta simples no WhatsApp)</option>
                   <option value="food">🍟 Comércio Alimentício / Delivery (Carrinho + Pedido Completo no WhatsApp)</option>
                 </select>
-                <p style={{ fontSize: 12, color: "#64748B", margin: "4px 0 0 0" }}>
-                  {storeType === "food" 
-                    ? "Permite que os clientes montem o pedido, escolham a quantidade e enviem tudo pronto no seu WhatsApp." 
-                    : "Ideal para produtos em geral, serviços ou vitrine de produtos individuais."}
-                </p>
               </div>
 
               <div>
@@ -341,7 +375,7 @@ export default function ProfileDashboard() {
               <div>
                 <label style={{ display: "block", fontSize: 13, fontWeight: "bold", marginBottom: 6 }}>Biografia / Descrição Curta:</label>
                 <textarea 
-                  placeholder="Resuma o segmento da sua loja ou principais ofertas..." 
+                  placeholder="Resuma o segmento da sua loja..." 
                   value={bio} 
                   onChange={(e) => setBio(e.target.value)} 
                   rows={3}
@@ -363,11 +397,8 @@ export default function ProfileDashboard() {
             </form>
           )}
 
-          {/* ABA 2: PERSONALIZAR VITRINE (SPLIT PANEL + PREVIEW AO VIVO) */}
-          {activeTab === "vitrine" && (
+          {userType === "store" && activeTab === "vitrine" && (
             <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(320px, 1fr))", gap: 30 }}>
-              
-              {/* Painel de Controles */}
               <form onSubmit={handleSaveProfile} style={{ display: "flex", flexDirection: "column", gap: 18 }}>
                 <h2 style={{ fontSize: 20, margin: 0, fontWeight: "bold", color: "#1E293B" }}>Aparência & Estilos</h2>
 
@@ -380,14 +411,10 @@ export default function ProfileDashboard() {
                         type="button"
                         onClick={() => setThemeColor(theme.id)}
                         style={{
-                          width: 38,
-                          height: 38,
-                          borderRadius: "50%",
+                          width: 38, height: 38, borderRadius: "50%",
                           backgroundColor: theme.color,
                           border: themeColor === theme.id ? "3px solid #1E293B" : "none",
-                          cursor: "pointer",
-                          transform: themeColor === theme.id ? "scale(1.1)" : "scale(1)",
-                          transition: "all 0.2s"
+                          cursor: "pointer"
                         }}
                         title={theme.name}
                       />
@@ -409,7 +436,7 @@ export default function ProfileDashboard() {
                 </div>
 
                 <div>
-                  <label style={{ display: "block", fontSize: 13, fontWeight: "bold", marginBottom: 6 }}>Banner de Capa da Vitrine:</label>
+                  <label style={{ display: "block", fontSize: 13, fontWeight: "bold", marginBottom: 6 }}>Banner de Capa:</label>
                   {bannerUrl && (
                     <img src={bannerUrl} alt="Banner" style={{ width: "100%", height: 80, borderRadius: 6, objectFit: "cover", marginBottom: 10 }} />
                   )}
@@ -421,13 +448,10 @@ export default function ProfileDashboard() {
                 </button>
               </form>
 
-              {/* Pré-visualização em Tempo Real */}
               <div style={{ border: "1px solid #E2E8F0", borderRadius: 10, overflow: "hidden", backgroundColor: "#F8FAFC" }}>
                 <div style={{ padding: "8px 12px", backgroundColor: "#E2E8F0", fontSize: 11, fontWeight: "bold", color: "#64748B" }}>
-                  👁️ PRÉ-VISUALIZAÇÃO EM TEMPO REAL ({storeType === "food" ? "🍟 MODO CARDÁPIO" : "🛍️ MODO VITRINE"})
+                  👁️ PRÉ-VISUALIZAÇÃO EM TEMPO REAL
                 </div>
-
-                {/* Banner de Capa no Preview */}
                 <div style={{ height: 100, backgroundColor: activeThemeHex, position: "relative", backgroundImage: bannerUrl ? `url(${bannerUrl})` : "none", backgroundSize: "cover", backgroundPosition: "center" }}>
                   {currentLogoUrl ? (
                     <img src={currentLogoUrl} alt="Logo" style={{ width: 60, height: 60, borderRadius: "50%", position: "absolute", bottom: -20, left: 15, border: "3px solid #fff", objectFit: "cover" }} />
@@ -437,44 +461,20 @@ export default function ProfileDashboard() {
                     </div>
                   )}
                 </div>
-
                 <div style={{ padding: "30px 15px 15px 15px", fontFamily: activeFontFamily }}>
                   <h3 style={{ margin: 0, color: activeThemeHex, fontSize: 18 }}>{storeName || "Nome da Loja"}</h3>
-                  <p style={{ margin: "4px 0 10px 0", fontSize: 12, color: "#64748B" }}>{bio || "Descrição da loja..."}</p>
-
-                  {/* Card de Exemplo de Produto */}
-                  <div style={{ border: "1px solid #E2E8F0", borderRadius: 8, overflow: "hidden", backgroundColor: "#fff", marginTop: 15 }}>
-                    <div style={{ height: 100, backgroundColor: "#F1F5F9", display: "flex", alignItems: "center", justifyContent: "center", color: "#94A3B8", fontSize: 12 }}>
-                      Imagem do Produto
-                    </div>
-                    <div style={{ padding: 10 }}>
-                      <h4 style={{ margin: 0, fontSize: 13 }}>Produto Exemplo</h4>
-                      <p style={{ margin: "5px 0", color: activeThemeHex, fontWeight: "bold", fontSize: 14 }}>R$ 99,90</p>
-                      
-                      {storeType === "food" ? (
-                        <button style={{ width: "100%", padding: 6, backgroundColor: activeThemeHex, color: "#fff", border: "none", borderRadius: 4, fontWeight: "bold", fontSize: 11 }}>
-                          🛒 Adicionar ao Pedido
-                        </button>
-                      ) : (
-                        <button style={{ width: "100%", padding: 6, backgroundColor: "#22C55E", color: "#fff", border: "none", borderRadius: 4, fontWeight: "bold", fontSize: 11 }}>
-                          💬 WhatsApp
-                        </button>
-                      )}
-                    </div>
-                  </div>
+                  <p style={{ margin: "4px 0 10px 0", fontSize: 12, color: "#64748B" }}>{bio || "Descrição..."}</p>
                 </div>
               </div>
-
             </div>
           )}
 
-          {/* ABA 3: MEUS ANÚNCIOS */}
-          {activeTab === "anuncios" && (
+          {(userType === "client" || activeTab === "anuncios") && (
             <div>
               <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 20 }}>
                 <div>
                   <h2 style={{ fontSize: 20, margin: 0, fontWeight: "bold", color: "#1E293B" }}>Estoque / Anúncios</h2>
-                  <p style={{ color: "#64748B", margin: "4px 0 0 0", fontSize: 13 }}>Gerencie as publicações exibidas na sua vitrine e no feed.</p>
+                  <p style={{ color: "#64748B", margin: "4px 0 0 0", fontSize: 13 }}>Gerencie as publicações exibidas no site.</p>
                 </div>
                 <button onClick={() => window.location.href = "/create"} style={{ padding: "10px 14px", backgroundColor: activeThemeHex, color: "#fff", border: "none", borderRadius: 6, fontWeight: "bold", cursor: "pointer", fontSize: 13 }}>
                   + Novo Anúncio
@@ -493,7 +493,7 @@ export default function ProfileDashboard() {
               ) : (
                 <div style={{ display: "flex", flexDirection: "column", gap: 12 }}>
                   {myAds.map((ad) => (
-                    <div key={ad.id} style={{ display: "flex", gap: 15, padding: 12, border: "1px solid #E2E8F0", borderRadius: 8, alignItems: "center", justifyContent: "space-between", flexWrap: "wrap" }}>
+                    <div key={ad.id} style={{ display: "flex", gap: 15, padding: 12, border: "1px solid #E2E8F0", borderRadius: 8, alignItems: "center", justifyContent: "space-between", flexWrap: "wrap", opacity: ad.is_hidden ? 0.6 : 1, backgroundColor: ad.is_hidden ? "#F8FAFC" : "#fff" }}>
                       <div style={{ display: "flex", gap: 12, alignItems: "center", flex: 1, minWidth: 200 }}>
                         {ad.image_url ? (
                           <img src={ad.image_url} alt={ad.title} style={{ width: 55, height: 55, borderRadius: 6, objectFit: "cover" }} />
@@ -501,7 +501,9 @@ export default function ProfileDashboard() {
                           <div style={{ width: 55, height: 55, borderRadius: 6, backgroundColor: "#F1F5F9", display: "flex", alignItems: "center", justifyContent: "center", fontSize: 10, color: "#94A3B8" }}>Sem foto</div>
                         )}
                         <div style={{ minWidth: 0 }}>
-                          <h4 style={{ margin: 0, fontSize: 14, fontWeight: "bold", color: "#1E293B", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{ad.title}</h4>
+                          <h4 style={{ margin: 0, fontSize: 14, fontWeight: "bold", color: "#1E293B", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
+                            {ad.title} {ad.is_hidden && <span style={{ color: "#DC2626", fontSize: 11 }}>(Oculto / Esgotado)</span>}
+                          </h4>
                           <p style={{ margin: "3px 0 0 0", fontSize: 13, color: activeThemeHex, fontWeight: "bold" }}>
                             {ad.price ? `R$ ${ad.price.toFixed(2)}` : "Valor a combinar"}
                           </p>
@@ -510,19 +512,40 @@ export default function ProfileDashboard() {
                       </div>
 
                       <div style={{ display: "flex", gap: 6, flexShrink: 0, marginTop: 8 }}>
-                        <button 
-                          onClick={() => handleCreateStory(ad)}
-                          disabled={postingStoryId === ad.id}
-                          style={{ padding: "8px 10px", backgroundColor: activeThemeHex, color: "#fff", border: "none", borderRadius: 6, fontSize: 11, fontWeight: "bold", cursor: "pointer" }}
-                        >
-                          {postingStoryId === ad.id ? "Postando..." : "⚡ Destacar 24h"}
-                        </button>
+                        {userType === "store" && (
+                          <button 
+                            onClick={() => handleCreateStory(ad)}
+                            disabled={postingStoryId === ad.id || ad.is_hidden}
+                            style={{ padding: "8px 10px", backgroundColor: ad.is_hidden ? "#CBD5E1" : activeThemeHex, color: "#fff", border: "none", borderRadius: 6, fontSize: 11, fontWeight: "bold", cursor: ad.is_hidden ? "not-allowed" : "pointer" }}
+                          >
+                            {postingStoryId === ad.id ? "Postando..." : "⚡ Destacar 24h"}
+                          </button>
+                        )}
+
+                        {/* Botão Dinâmico: Se for loja, vira Ocultar/Adicionar. Se for individual, vira Vendido */}
+                        {userType === "store" ? (
+                          <button 
+                            onClick={() => handleToggleHideAd(ad.id, ad.is_hidden)}
+                            style={{ padding: "8px 10px", backgroundColor: ad.is_hidden ? "#D1FAE5" : "#FEF3C7", color: ad.is_hidden ? "#065F46" : "#92400E", border: "none", borderRadius: 6, fontSize: 11, fontWeight: "bold", cursor: "pointer" }}
+                          >
+                            {ad.is_hidden ? "Adicionar" : "Ocultar"}
+                          </button>
+                        ) : (
+                          <button 
+                            onClick={() => handleMarkAsSold(ad.id, ad.title)}
+                            style={{ padding: "8px 10px", backgroundColor: "#D1FAE5", color: "#065F46", border: "none", borderRadius: 6, fontSize: 11, fontWeight: "bold", cursor: "pointer" }}
+                          >
+                            Vendido
+                          </button>
+                        )}
+
                         <button 
                           onClick={() => window.location.href = `/edit-ad/${ad.id}`}
                           style={{ padding: "8px 10px", backgroundColor: "#E2E8F0", color: "#1E293B", border: "none", borderRadius: 6, fontSize: 11, fontWeight: "bold", cursor: "pointer" }}
                         >
                           Editar
                         </button>
+
                         <button 
                           onClick={() => handleDeleteAd(ad.id, ad.title)}
                           style={{ padding: "8px 10px", backgroundColor: "#FEE2E2", color: "#DC2626", border: "none", borderRadius: 6, fontSize: 11, fontWeight: "bold", cursor: "pointer" }}

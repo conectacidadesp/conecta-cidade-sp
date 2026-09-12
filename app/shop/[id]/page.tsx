@@ -13,6 +13,7 @@ interface Ad {
   image_url: string | null;
   whatsapp: string;
   category?: string | null;
+  is_hidden?: boolean | null;
 }
 
 interface StoreProfile {
@@ -100,11 +101,12 @@ function ShopContent() {
         setProfile(profileData);
       }
 
-      // Busca anúncios
+      // Busca anúncios ativos (ignorando os ocultos: is_hidden IS NOT TRUE)
       const { data: adsData } = await supabase
         .from("ads")
         .select("*")
         .eq("user_id", storeUserId)
+        .or("is_hidden.is.null,is_hidden.eq.false")
         .order("created_at", { ascending: false });
 
       if (adsData) {

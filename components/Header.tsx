@@ -19,14 +19,17 @@ export default function Header() {
     if (session?.user) {
       const { data: profile } = await supabase
         .from("profiles")
-        .select("id, name, avatar_url")
+        .select("id, name, avatar_url, store_name")
         .eq("id", session.user.id)
         .single();
+
+      // Pega o nome da loja se existir, senão define um padrão limpo (sem mostrar o email/phone cru)
+      const cleanName = profile?.store_name || profile?.name || "Meus Anúncios";
 
       setUser(
         profile || {
           id: session.user.id,
-          name: session.user.user_metadata?.full_name || session.user.email?.split("@")[0],
+          name: cleanName,
           avatar_url: session.user.user_metadata?.avatar_url,
         }
       );
@@ -54,7 +57,7 @@ export default function Header() {
 
   async function handleLogout() {
     await supabase.auth.signOut();
-    localStorage.removeItem("sb-ahiyxrdplheckszoiogd-auth-token"); // limpa token local se houver
+    localStorage.removeItem("sb-ahiyxrdplheckszoiogd-auth-token");
     setUser(null);
     window.location.href = "/";
   }
@@ -96,7 +99,7 @@ export default function Header() {
                 {user.avatar_url ? (
                   <img
                     src={user.avatar_url}
-                    alt={user.name || "Perfil"}
+                    alt="Perfil"
                     style={{ width: 28, height: 28, borderRadius: "50%", objectFit: "cover", border: "1px solid #fff" }}
                   />
                 ) : (
@@ -104,7 +107,8 @@ export default function Header() {
                     🏪
                   </div>
                 )}
-                <span>{user.name || "Minha Loja"}</span>
+                {/* Alterado para exibir explicitamente 'Meus Anúncios' ou o nome da loja cadastrada */}
+                <span>Meus Anúncios</span>
               </a>
 
               {/* BOTÃO DESCONECTAR / SAIR */}

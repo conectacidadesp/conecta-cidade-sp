@@ -2,6 +2,7 @@
 
 import { useState, useEffect } from "react";
 import { supabase } from "@/lib/supabase";
+import { useRouter } from "next/navigation";
 
 // 📂 Dicionário de Categorias e Subcategorias com Emojis Compatíveis e Universais
 const categoriesData: Record<string, { icon: string; subs: string[] }> = {
@@ -112,16 +113,18 @@ export default function CreateAd() {
   const [whatsapp, setWhatsapp] = useState("");
   const [imageFile, setImageFile] = useState<File | null>(null);
   const [loading, setLoading] = useState(false);
+  const [checkingAuth, setCheckingAuth] = useState(true);
   const [city, setCity] = useState("Rubiácea-SP");
   
-  // 🏪 Estado para controlar se o anúncio vai para a loja virtual
-  const [addToStore, setAddToStore] = useState(false);
+  const router = useRouter();
 
-  // 🍔 Estados para controlar o perfil e tipo de loja do usuário logado
+  // 🏪 Estados para controlar o tipo e perfil do usuário logado
+  const [userType, setUserType] = useState<string>("client");
   const [storeType, setStoreType] = useState<"marketplace" | "food">("marketplace");
   const [profileWhatsapp, setProfileWhatsapp] = useState("");
+  const [loggedUserId, setLoggedUserId] = useState<string | null>(null);
 
-  // 🛡️ Carrega dados da cidade e perfil do usuário logado
+  // 🛡️ Proteção de Rota e Identificação de Perfil
   useEffect(() => {
     if (typeof window !== "undefined") {
       const savedCity = localStorage.getItem("selectedCity");
@@ -130,29 +133,40 @@ export default function CreateAd() {
       }
     }
 
-    async function loadUserProfile() {
-      const { data: { user } } = await supabase.auth.getUser();
-      if (user) {
-        const { data: profile } = await supabase
-          .from("profiles")
-          .select("store_type, whatsapp")
-          .eq("id", user.id)
-          .single();
+    async function checkUserSession() {
+      const { data: { user }, error: authError } = await supabase.auth.getUser();
+      
+      if (authError || !user) {
+        alert("⚠️ Você precisa estar logado para publicar um anúncio.");
+        router.push("/login");
+        return;
+      }
 
-        if (profile) {
-          setStoreType(profile.store_type || "marketplace");
-          setProfileWhatsapp(profile.whatsapp || "");
-          
-          // Se a loja for do tipo Alimentação / Delivery, pré-seleciona a categoria Alimentação
-          if (profile.store_type === "food") {
-            setCategory("Alimentação");
-          }
+      setLoggedUserId(user.id);
+
+      // Carrega os dados do perfil do usuário logado
+      const { data: profile } = await supabase
+        .from("profiles")
+        .select("store_type, whatsapp, user_type")
+        .eq("id", user.id)
+        .single();
+
+      if (profile) {
+        setUserType(profile.user_type || "client");
+        setStoreType(profile.store_type || "marketplace");
+        setProfileWhatsapp(profile.whatsapp || "");
+        
+        // Se for loja do tipo Alimentação, pré-seleciona a categoria
+        if (profile.user_type === "store" && profile.store_type === "food") {
+          setCategory("Alimentação");
         }
       }
+
+      setCheckingAuth(false);
     }
 
-    loadUserProfile();
-  }, []);
+    checkUserSession();
+  }, [router]);
 
   const handleCategoryChange = (e: React.ChangeEvent<HTMLSelectElement>) => {
     setCategory(e.target.value);
@@ -161,27 +175,13 @@ export default function CreateAd() {
 
   const handleCreate = async (e: React.FormEvent) => {
     e.preventDefault();
+    if (!loggedUserId) return;
+
     setLoading(true);
 
-    let loggedUserId = null;
-
-    // 🛡️ Se marcar a caixinha, valida se o usuário está autenticado
-    if (addToStore) {
-      const { data: { user }, error: authError } = await supabase.auth.getUser();
-      
-      if (authError || !user) {
-        alert("⚠️ Você precisa estar logado para adicionar este anúncio à sua Loja Virtual. Por favor, faça login primeiro.");
-        setLoading(false);
-        return;
-      }
-      
-      loggedUserId = user.id;
-    }
-
-    // Define o WhatsApp final: usa o digitado OU o cadastrado no perfil da loja
     const finalWhatsapp = whatsapp.trim() || profileWhatsapp;
 
-    if (!finalWhatsapp && !addToStore) {
+    if (!finalWhatsapp) {
       alert("⚠️ Por favor, informe um número de WhatsApp com DDD para o anúncio.");
       setLoading(false);
       return;
@@ -191,9 +191,7 @@ export default function CreateAd() {
 
     if (imageFile) {
       try {
-        // 🪶 Comprime e redimensiona antes do upload
         const compressedBlob = await compressAndResizeImage(imageFile, 800, 800, 0.8);
-        
         const fileName = `${Math.random()}.jpg`;
         const filePath = `public/${fileName}`;
 
@@ -219,6 +217,9 @@ export default function CreateAd() {
       }
     }
 
+    // Se for cliente, custom_category é null. Se for loja food, usa a subcategoria digitada.
+    const customCategoryValue = (userType === "store" && storeType === "food") ? subcategory : null;
+
     const { error } = await supabase.from("ads").insert([
       {
         title,
@@ -226,11 +227,11 @@ export default function CreateAd() {
         price: price ? parseFloat(price) : null,
         category,
         subcategory: subcategory || null,
-        custom_category: storeType === "food" ? subcategory : null, // Salva o grupo do cardápio se for Food
+        custom_category: customCategoryValue,
         whatsapp: finalWhatsapp,
         city: city,
         image_url: uploadedImageUrl || null,
-        user_id: loggedUserId // Salva o ID se for loja, ou NULL se for freelancer
+        user_id: loggedUserId
       },
     ]);
 
@@ -243,6 +244,10 @@ export default function CreateAd() {
       window.location.href = "/";
     }
   };
+
+  if (checkingAuth) {
+    return <p style={{ textAlign: "center", marginTop: 100, fontFamily: "sans-serif", color: "#64748B" }}>Verificando autenticação...</p>;
+  }
 
   return (
     <main style={{ padding: "20px 10px", maxWidth: 500, margin: "0 auto", fontFamily: "sans-serif", backgroundColor: "#F8FAFC", minHeight: "100vh" }}>
@@ -265,8 +270,8 @@ export default function CreateAd() {
             </select>
           </div>
 
-          {/* Subcategoria Dinâmica: Texto Livre se for Delivery / Select se for Marketplace */}
-          {category && storeType === "food" ? (
+          {/* Renderização condicional rigorosa: Cardápio livre apenas se for Loja Food */}
+          {userType === "store" && category && storeType === "food" ? (
             <div style={{ display: "flex", flexDirection: "column", gap: 5 }}>
               <label style={{ fontSize: 14, fontWeight: "bold", color: "#1E293B" }}>🍔 Categoria no Cardápio (Subcategoria):</label>
               <input
@@ -277,9 +282,6 @@ export default function CreateAd() {
                 required
                 style={{ padding: 12, border: "1px solid #CBD5E1", borderRadius: 6, fontSize: 15 }}
               />
-              <p style={{ fontSize: 11, color: "#64748B", margin: "2px 0 0 0" }}>
-                Os produtos com o mesmo nome ficarão agrupados juntos no seu cardápio público.
-              </p>
             </div>
           ) : (
             category && categoriesData[category]?.subs.length > 0 && (
@@ -295,7 +297,6 @@ export default function CreateAd() {
             )
           )}
 
-          {/* WhatsApp é Opcional se houver um WhatsApp pré-cadastrado na Loja */}
           <input 
             placeholder={profileWhatsapp ? `WhatsApp (Opcional - Padrão: ${profileWhatsapp})` : "WhatsApp com DDD (Apenas números)"} 
             value={whatsapp} 
@@ -307,20 +308,6 @@ export default function CreateAd() {
           <div style={{ display: "flex", flexDirection: "column", gap: 5 }}>
             <label style={{ fontSize: 14, fontWeight: "bold", color: "#1E293B" }}>📸 Foto do Produto (Opcional):</label>
             <input type="file" accept="image/*" onChange={(e) => e.target.files && setImageFile(e.target.files[0])} style={{ fontSize: 14, cursor: "pointer" }} />
-          </div>
-
-          {/* 🏪 CAIXINHA DE SELEÇÃO DA LOJA VIRTUAL */}
-          <div style={{ display: "flex", alignItems: "center", gap: 10, backgroundColor: "#EFF6FF", padding: 12, borderRadius: 8, border: "1px dashed #BFDBFE", margin: "5px 0" }}>
-            <input 
-              type="checkbox" 
-              id="store-checkbox"
-              checked={addToStore} 
-              onChange={(e) => setAddToStore(e.target.checked)} 
-              style={{ width: 18, height: 18, cursor: "pointer" }}
-            />
-            <label htmlFor="store-checkbox" style={{ fontSize: 14, fontWeight: "bold", color: "#1E40AF", cursor: "pointer" }}>
-              🏪 Adicionar na Loja ou Estoque Virtual?
-            </label>
           </div>
 
           <button type="submit" disabled={loading} style={{ padding: 14, backgroundColor: "#0F4C81", color: "white", border: "none", borderRadius: 6, fontSize: 16, fontWeight: "bold", cursor: "pointer", marginTop: 10 }}>

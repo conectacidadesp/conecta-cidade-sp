@@ -15,6 +15,7 @@ interface Story {
     id?: string;
     store_name: string | null;
     logo_url: string | null;
+    city?: string | null;
   } | null;
 }
 
@@ -40,7 +41,8 @@ export default function StoriesBar({ selectedCity }: { selectedCity?: string }) 
     async function loadStories() {
       setLoading(true);
 
-      const { data, error } = await supabase
+      // Iniciamos a query na tabela stories com o join na tabela profiles
+      let query = supabase
         .from("stories")
         .select(`
           id,
@@ -51,13 +53,24 @@ export default function StoriesBar({ selectedCity }: { selectedCity?: string }) 
           profiles (
             id,
             store_name,
-            logo_url
+            logo_url,
+            city
           )
         `)
         .order("created_at", { ascending: false });
 
+      const { data, error } = await query;
+
       if (!error && data) {
-        const rawStories = data as unknown as Story[];
+        let rawStories = data as unknown as Story[];
+
+        // Filtra por cidade caso ela tenha sido selecionada (respeitando a bolha da cidade)
+        if (selectedCity) {
+          rawStories = rawStories.filter((story) => {
+            const profileCity = story.profiles?.city;
+            return profileCity && profileCity.trim().toLowerCase() === selectedCity.trim().toLowerCase();
+          });
+        }
 
         // Agrupa os stories por loja
         const storeMap = new Map<string, GroupedStore>();
@@ -202,7 +215,7 @@ export default function StoriesBar({ selectedCity }: { selectedCity?: string }) 
         </div>
       </div>
 
-      {/* Modal / Carrossel de Stories */}
+      {/* Modal / Carrossel de Stories - Centralizado perfeitamente para Mobile e Desktop */}
       {activeStore && currentStory && (
         <div
           onClick={() => setActiveStore(null)}
@@ -217,7 +230,8 @@ export default function StoriesBar({ selectedCity }: { selectedCity?: string }) 
             display: "flex",
             alignItems: "center",
             justifyContent: "center",
-            padding: 20,
+            padding: "10px",
+            boxSizing: "border-box",
           }}
         >
           <div
@@ -226,15 +240,18 @@ export default function StoriesBar({ selectedCity }: { selectedCity?: string }) 
               backgroundColor: "#1E293B",
               borderRadius: 12,
               overflow: "hidden",
-              maxWidth: 400,
+              maxWidth: 380,
               width: "100%",
+              maxHeight: "90vh",
               color: "#fff",
               position: "relative",
               boxShadow: "0 20px 25px -5px rgba(0,0,0,0.5)",
+              display: "flex",
+              flexDirection: "column",
             }}
           >
             {/* Barras de Progresso */}
-            <div style={{ display: "flex", gap: 4, padding: "10px 12px 0 12px", backgroundColor: "#1E293B" }}>
+            <div style={{ display: "flex", gap: 4, padding: "10px 12px 0 12px", backgroundColor: "#1E293B", flexShrink: 0 }}>
               {activeStore.stories.map((s, idx) => (
                 <div
                   key={s.id}
@@ -250,7 +267,7 @@ export default function StoriesBar({ selectedCity }: { selectedCity?: string }) 
             </div>
 
             {/* Header */}
-            <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", padding: 12, borderBottom: "1px solid #334155" }}>
+            <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", padding: 12, borderBottom: "1px solid #334155", flexShrink: 0 }}>
               <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
                 <img
                   src={activeStore.logoUrl}
@@ -268,11 +285,11 @@ export default function StoriesBar({ selectedCity }: { selectedCity?: string }) 
             </div>
 
             {/* Imagem + Controles */}
-            <div style={{ position: "relative", width: "100%", height: 350, backgroundColor: "#000", display: "flex", alignItems: "center", justifyContent: "center" }}>
+            <div style={{ position: "relative", width: "100%", height: "320px", backgroundColor: "#000", display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0 }}>
               <img
                 src={currentStory.image_url}
                 alt="Story"
-                style={{ width: "100%", height: "100%", objectFit: "contain" }}
+                style={{ width: "100%", height: "100%", objectFit: "contain", objectPosition: "center" }}
               />
 
               <div
@@ -287,8 +304,8 @@ export default function StoriesBar({ selectedCity }: { selectedCity?: string }) 
             </div>
 
             {/* Rodapé / Ação */}
-            <div style={{ padding: 15, textAlign: "center" }}>
-              <p style={{ margin: "0 0 12px 0", fontSize: 14, fontWeight: "bold" }}>
+            <div style={{ padding: 15, textAlign: "center", flexShrink: 0 }}>
+              <p style={{ margin: "0 0 12px 0", fontSize: 14, fontWeight: "bold", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
                 {currentStory.title || "Oferta da Loja"}
               </p>
               <button
