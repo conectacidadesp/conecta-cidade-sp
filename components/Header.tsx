@@ -2,6 +2,8 @@
 
 import { useEffect, useState } from "react";
 import { supabase } from "@/lib/supabase";
+import Image from "next/image";
+import Link from "next/link";
 
 interface UserProfile {
   id: string;
@@ -23,7 +25,6 @@ export default function Header() {
         .eq("id", session.user.id)
         .single();
 
-      // Pega o nome da loja se existir, senão define um padrão limpo (sem mostrar o email/phone cru)
       const cleanName = profile?.store_name || profile?.name || "Meus Anúncios";
 
       setUser(
@@ -66,13 +67,21 @@ export default function Header() {
     <header style={{ backgroundColor: "#0F4C81", color: "#fff", padding: "12px 20px" }}>
       <div style={{ maxWidth: 1100, margin: "0 auto", display: "flex", justifyContent: "space-between", alignItems: "center", flexWrap: "wrap", gap: 10 }}>
         {/* LOGO DO SITE */}
-        <a href="/" style={{ display: "flex", alignItems: "center", gap: 8, textDecoration: "none", color: "#fff" }}>
-          <span style={{ fontSize: 24 }}>📍</span>
-          <div>
-            <h1 style={{ margin: 0, fontSize: 20, fontWeight: "bold" }}>Conecta Cidade SP</h1>
-            <p style={{ margin: 0, fontSize: 11, opacity: 0.8 }}>Classificados Regionais</p>
-          </div>
-        </a>
+        <Link href="/" style={{ display: "flex", alignItems: "center", textDecoration: "none" }}>
+          <Image 
+            src="/logo.png" 
+            alt="Conecta Cidade SP" 
+            width={160} 
+            height={45} 
+            priority
+            style={{ 
+              width: "auto", 
+              height: "40px", 
+              maxHeight: "48px", 
+              objectFit: "contain" 
+            }} 
+          />
+        </Link>
 
         {/* ÁREA DE NAVEGAÇÃO DO USUÁRIO */}
         <div style={{ display: "flex", gap: 10, alignItems: "center" }}>
@@ -107,7 +116,6 @@ export default function Header() {
                     🏪
                   </div>
                 )}
-                {/* Alterado para exibir explicitamente 'Meus Anúncios' ou o nome da loja cadastrada */}
                 <span>Meus Anúncios</span>
               </a>
 
