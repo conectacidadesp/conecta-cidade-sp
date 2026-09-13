@@ -2,7 +2,6 @@
 
 import { useEffect, useState } from "react";
 import { supabase } from "@/lib/supabase";
-import Image from "next/image";
 import Link from "next/link";
 
 interface UserProfile {
@@ -67,32 +66,29 @@ export default function Header() {
     <header style={{ backgroundColor: "#0F4C81", color: "#fff", padding: "10px 20px" }}>
       <div style={{ maxWidth: 1100, margin: "0 auto", display: "flex", justifyContent: "space-between", alignItems: "center", flexWrap: "wrap", gap: 10 }}>
         
-        {/* LOGO COM FUNDO BRANCO EXCLUSIVO PARA DAR CONTRASTE */}
+        {/* LOGO EM TEXTO PROFISSIONAL (GARANTIDO QUE APARECE SEM ERROS) */}
         <Link 
           href="/" 
           style={{ 
             display: "flex", 
             alignItems: "center", 
+            gap: "8px",
             backgroundColor: "#ffffff", 
-            padding: "6px 10px", 
+            padding: "8px 14px", 
             borderRadius: "8px", 
             boxShadow: "0 2px 4px rgba(0,0,0,0.15)",
             textDecoration: "none" 
           }}
         >
-          <Image 
-            src="/logo.png" 
-            alt="Conecta Cidade SP" 
-            width={150} 
-            height={50} 
-            priority
-            style={{ 
-              width: "auto", 
-              height: "42px", 
-              objectFit: "contain",
-              display: "block"
-            }} 
-          />
+          <span style={{ fontSize: "20px" }}>📍</span>
+          <div style={{ display: "flex", flexDirection: "column", lineHeight: "1.1" }}>
+            <span style={{ color: "#0F4C81", fontWeight: "900", fontSize: "16px", letterSpacing: "-0.5px" }}>
+              CONECTA
+            </span>
+            <span style={{ fontSize: "12px", fontWeight: "bold" }}>
+              <span style={{ color: "#0F4C81" }}>Cidade</span> <span style={{ color: "#F97316" }}>SP</span>
+            </span>
+          </div>
         </Link>
 
         {/* ÁREA DE NAVEGAÇÃO DO USUÁRIO */}
