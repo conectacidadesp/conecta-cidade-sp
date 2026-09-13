@@ -66,19 +66,31 @@ export default function Header() {
   return (
     <header style={{ backgroundColor: "#0F4C81", color: "#fff", padding: "10px 20px" }}>
       <div style={{ maxWidth: 1100, margin: "0 auto", display: "flex", justifyContent: "space-between", alignItems: "center", flexWrap: "wrap", gap: 10 }}>
-        {/* LOGO DO SITE */}
-        <Link href="/" style={{ display: "flex", alignItems: "center", textDecoration: "none" }}>
+        
+        {/* LOGO COM FUNDO BRANCO EXCLUSIVO PARA DAR CONTRASTE */}
+        <Link 
+          href="/" 
+          style={{ 
+            display: "flex", 
+            alignItems: "center", 
+            backgroundColor: "#ffffff", 
+            padding: "6px 10px", 
+            borderRadius: "8px", 
+            boxShadow: "0 2px 4px rgba(0,0,0,0.15)",
+            textDecoration: "none" 
+          }}
+        >
           <Image 
             src="/logo.png" 
             alt="Conecta Cidade SP" 
-            width={220} 
-            height={70} 
+            width={150} 
+            height={50} 
             priority
             style={{ 
               width: "auto", 
-              height: "55px", // Altura maior para acomodar perfeitamente o símbolo e o texto da logo quadrada
-              maxHeight: "65px", 
-              objectFit: "contain" 
+              height: "42px", 
+              objectFit: "contain",
+              display: "block"
             }} 
           />
         </Link>
