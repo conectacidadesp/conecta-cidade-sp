@@ -64,20 +64,20 @@ export default function Header() {
   }
 
   return (
-    <header style={{ backgroundColor: "#0F4C81", color: "#fff", padding: "12px 20px" }}>
+    <header style={{ backgroundColor: "#0F4C81", color: "#fff", padding: "10px 20px" }}>
       <div style={{ maxWidth: 1100, margin: "0 auto", display: "flex", justifyContent: "space-between", alignItems: "center", flexWrap: "wrap", gap: 10 }}>
         {/* LOGO DO SITE */}
         <Link href="/" style={{ display: "flex", alignItems: "center", textDecoration: "none" }}>
           <Image 
             src="/logo.png" 
             alt="Conecta Cidade SP" 
-            width={160} 
-            height={45} 
+            width={220} 
+            height={70} 
             priority
             style={{ 
               width: "auto", 
-              height: "40px", 
-              maxHeight: "48px", 
+              height: "55px", // Altura maior para acomodar perfeitamente o símbolo e o texto da logo quadrada
+              maxHeight: "65px", 
               objectFit: "contain" 
             }} 
           />
