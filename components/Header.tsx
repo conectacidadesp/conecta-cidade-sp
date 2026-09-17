@@ -66,29 +66,24 @@ export default function Header() {
     <header style={{ backgroundColor: "#0F4C81", color: "#fff", padding: "10px 20px" }}>
       <div style={{ maxWidth: 1100, margin: "0 auto", display: "flex", justifyContent: "space-between", alignItems: "center", flexWrap: "wrap", gap: 10 }}>
         
-        {/* LOGO EM TEXTO PROFISSIONAL (GARANTIDO QUE APARECE SEM ERROS) */}
+        {/* LOGO OFICIAL EM IMAGEM */}
         <Link 
           href="/" 
           style={{ 
             display: "flex", 
             alignItems: "center", 
-            gap: "8px",
             backgroundColor: "#ffffff", 
-            padding: "8px 14px", 
+            padding: "6px 12px", 
             borderRadius: "8px", 
             boxShadow: "0 2px 4px rgba(0,0,0,0.15)",
             textDecoration: "none" 
           }}
         >
-          <span style={{ fontSize: "20px" }}>📍</span>
-          <div style={{ display: "flex", flexDirection: "column", lineHeight: "1.1" }}>
-            <span style={{ color: "#0F4C81", fontWeight: "900", fontSize: "16px", letterSpacing: "-0.5px" }}>
-              CONECTA
-            </span>
-            <span style={{ fontSize: "12px", fontWeight: "bold" }}>
-              <span style={{ color: "#0F4C81" }}>Cidade</span> <span style={{ color: "#F97316" }}>SP</span>
-            </span>
-          </div>
+          <img 
+            src="/logo.png" 
+            alt="Conecta Cidade SP" 
+            style={{ height: "36px", width: "auto", objectFit: "contain" }} 
+          />
         </Link>
 
         {/* ÁREA DE NAVEGAÇÃO DO USUÁRIO */}

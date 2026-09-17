@@ -296,12 +296,35 @@ export default function Home() {
         )}
       </main>
 
-      {/* 🚨 MODAL DE DENÚNCIA */}
+      {/* 🚨 MODAL DE DENÚNCIA CORRIGIDO PARA CELULAR */}
       {reportingAd && (
-        <div style={{ position: "fixed", top: 0, left: 0, width: "100%", height: "100%", backgroundColor: "rgba(0,0,0,0.5)", display: "flex", alignItems: "center", justifyContent: "center", zIndex: 1000, padding: 20 }}>
-          <div style={{ backgroundColor: "#fff", borderRadius: 10, padding: 25, maxWidth: 450, width: "100%", boxShadow: "0 4px 12px rgba(0,0,0,0.15)" }}>
+        <div style={{ 
+          position: "fixed", 
+          top: 0, 
+          left: 0, 
+          width: "100vw", 
+          height: "100vh", 
+          backgroundColor: "rgba(0,0,0,0.6)", 
+          display: "flex", 
+          alignItems: "center", 
+          justifyContent: "center", 
+          zIndex: 9999, 
+          padding: "16px", 
+          boxSizing: "border-box" 
+        }}>
+          <div style={{ 
+            backgroundColor: "#fff", 
+            borderRadius: 12, 
+            padding: "20px", 
+            maxWidth: 450, 
+            width: "100%", 
+            boxShadow: "0 10px 25px rgba(0,0,0,0.2)",
+            boxSizing: "border-box",
+            maxHeight: "90vh",
+            overflowY: "auto"
+          }}>
             <h3 style={{ margin: "0 0 10px", color: "#1E293B", fontSize: 18 }}>Denunciar Anúncio</h3>
-            <p style={{ fontSize: 13, color: "#64748B", margin: "0 0 15px" }}>
+            <p style={{ fontSize: 13, color: "#64748B", margin: "0 0 15px", wordBreak: "break-word" }}>
               Anúncio: <strong>{reportingAd.title}</strong>
             </p>
 
@@ -313,7 +336,7 @@ export default function Home() {
                 <select
                   value={reportReason}
                   onChange={(e) => setReportReason(e.target.value)}
-                  style={{ width: "100%", padding: "10px", borderRadius: 6, border: "1px solid #CBD5E1", fontSize: 14 }}
+                  style={{ width: "100%", padding: "10px", borderRadius: 6, border: "1px solid #CBD5E1", fontSize: 14, boxSizing: "border-box" }}
                 >
                   <option value="Conteúdo impróprio / Proibido">Conteúdo impróprio / Proibido</option>
                   <option value="Suspeita de Golpe / Fraude">Suspeita de Golpe / Fraude</option>
@@ -332,11 +355,11 @@ export default function Home() {
                   value={reportDetails}
                   onChange={(e) => setReportDetails(e.target.value)}
                   rows={3}
-                  style={{ width: "100%", padding: "10px", borderRadius: 6, border: "1px solid #CBD5E1", fontSize: 14, resize: "vertical" }}
+                  style={{ width: "100%", padding: "10px", borderRadius: 6, border: "1px solid #CBD5E1", fontSize: 14, resize: "vertical", boxSizing: "border-box" }}
                 />
               </div>
 
-              <div style={{ display: "flex", justifyContent: "flex-end", gap: 10 }}>
+              <div style={{ display: "flex", justifyContent: "flex-end", gap: 10, flexWrap: "wrap" }}>
                 <button
                   type="button"
                   onClick={() => setReportingAd(null)}
