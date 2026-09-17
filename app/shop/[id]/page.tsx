@@ -331,7 +331,6 @@ function ShopContent() {
                         {displayItems.map((ad, idx) => {
                           const isHighlighted = ad.id === highlightedAdId;
 
-                          // Mensagem detalhada para o WhatsApp no modo Marketplace
                           const marketMessage = `🚀 *Olá! Estou vindo do ConectaCidadeSp e tenho interesse neste produto:*\n\n` +
                             `📦 *${ad.title}*\n` +
                             `💰 *Preço:* ${ad.price ? `R$ ${ad.price.toFixed(2)}` : "A combinar"}\n` +
@@ -454,57 +453,55 @@ function ShopContent() {
         </div>
       )}
 
-      {/* MODAL / GAVETA DO CARRINHO */}
+      {/* MODAL / GAVETA DO CARRINHO (Com scroll livre e respiro extra embaixo para mobile) */}
       {isCartOpen && (
         <div style={{ position: "fixed", top: 0, left: 0, width: "100vw", height: "100vh", backgroundColor: "rgba(0,0,0,0.6)", zIndex: 9999, display: "flex", justifyContent: "flex-end" }}>
-          <div style={{ width: "100%", maxWidth: "420px", backgroundColor: "#fff", height: "100%", padding: "20px", paddingBottom: "40px", display: "flex", flexDirection: "column", justifyContent: "space-between", overflowY: "auto" }}>
-            <div>
-              <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", borderBottom: "1px solid #E2E8F0", paddingBottom: "15px" }}>
-                <h2 style={{ fontSize: "20px", margin: 0, color: "#1E293B" }}>🛍️ Seu Pedido</h2>
-                <button onClick={() => setIsCartOpen(false)} style={{ background: "none", border: "none", fontSize: "20px", cursor: "pointer" }}>✕</button>
-              </div>
+          <div style={{ width: "100%", maxWidth: "420px", backgroundColor: "#fff", height: "100%", padding: "20px", paddingBottom: "80px", display: "flex", flexDirection: "column", overflowY: "auto" }}>
+            <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", borderBottom: "1px solid #E2E8F0", paddingBottom: "15px" }}>
+              <h2 style={{ fontSize: "20px", margin: 0, color: "#1E293B" }}>🛍️ Seu Pedido</h2>
+              <button onClick={() => setIsCartOpen(false)} style={{ background: "none", border: "none", fontSize: "20px", cursor: "pointer" }}>✕</button>
+            </div>
 
-              {/* LISTA DE ITENS */}
-              <div style={{ marginTop: "20px", display: "flex", flexDirection: "column", gap: "15px" }}>
-                {cart.length === 0 ? (
-                  <p style={{ color: "#64748B", textAlign: "center" }}>Seu carrinho está vazio.</p>
-                ) : (
-                  cart.map((item) => (
-                    <div key={item.ad.id} style={{ display: "flex", justifyContent: "space-between", alignItems: "center", borderBottom: "1px solid #F1F5F9", paddingBottom: "10px" }}>
-                      <div>
-                        <p style={{ margin: 0, fontWeight: "bold", fontSize: "14px", color: "#1E293B" }}>{item.ad.title}</p>
-                        <p style={{ margin: "2px 0 0 0", color: theme.primary, fontSize: "13px", fontWeight: "bold" }}>R$ {((item.ad.price || 0) * item.quantity).toFixed(2)}</p>
-                      </div>
-                      <div style={{ display: "flex", alignItems: "center", gap: "8px" }}>
-                        <button onClick={() => updateQuantity(item.ad.id, -1)} style={{ width: "28px", height: "28px", borderRadius: "50%", border: "1px solid #CBD5E1", background: "#F8FAFC", cursor: "pointer", fontWeight: "bold" }}>-</button>
-                        <span style={{ fontWeight: "bold", fontSize: "14px", color: "#1E293B" }}>{item.quantity}</span>
-                        <button onClick={() => updateQuantity(item.ad.id, 1)} style={{ width: "28px", height: "28px", borderRadius: "50%", border: "1px solid #CBD5E1", background: "#F8FAFC", cursor: "pointer", fontWeight: "bold" }}>+</button>
-                        <button onClick={() => removeFromCart(item.ad.id)} style={{ background: "none", border: "none", color: "#EF4444", marginLeft: "4px", cursor: "pointer", fontSize: "16px" }} title="Remover item">🗑️</button>
-                      </div>
+            {/* LISTA DE ITENS */}
+            <div style={{ marginTop: "20px", display: "flex", flexDirection: "column", gap: "15px" }}>
+              {cart.length === 0 ? (
+                <p style={{ color: "#64748B", textAlign: "center" }}>Seu carrinho está vazio.</p>
+              ) : (
+                cart.map((item) => (
+                  <div key={item.ad.id} style={{ display: "flex", justifyContent: "space-between", alignItems: "center", borderBottom: "1px solid #F1F5F9", paddingBottom: "10px" }}>
+                    <div>
+                      <p style={{ margin: 0, fontWeight: "bold", fontSize: "14px", color: "#1E293B" }}>{item.ad.title}</p>
+                      <p style={{ margin: "2px 0 0 0", color: theme.primary, fontSize: "13px", fontWeight: "bold" }}>R$ {((item.ad.price || 0) * item.quantity).toFixed(2)}</p>
                     </div>
-                  ))
-                )}
-              </div>
-
-              {/* DADOS DA ENTREGA */}
-              {cart.length > 0 && (
-                <div style={{ marginTop: "25px", marginBottom: "20px", display: "flex", flexDirection: "column", gap: "12px" }}>
-                  <h3 style={{ fontSize: "15px", margin: 0, color: "#1E293B" }}>📋 Dados da Entrega</h3>
-                  <input type="text" placeholder="Seu Nome" value={customerName} onChange={(e) => setCustomerName(e.target.value)} style={{ width: "100%", padding: "10px", borderRadius: "6px", border: "1px solid #CBD5E1", fontSize: "13px" }} />
-                  <input type="text" placeholder="Endereço de Entrega (Rua, Nº, Bairro)" value={customerAddress} onChange={(e) => setCustomerAddress(e.target.value)} style={{ width: "100%", padding: "10px", borderRadius: "6px", border: "1px solid #CBD5E1", fontSize: "13px" }} />
-                  <select value={paymentMethod} onChange={(e) => setPaymentMethod(e.target.value)} style={{ width: "100%", padding: "10px", borderRadius: "6px", border: "1px solid #CBD5E1", fontSize: "13px" }}>
-                    <option value="Pix">Pix</option>
-                    <option value="Cartão de Crédito/Débito">Cartão de Crédito/Débito</option>
-                    <option value="Dinheiro (com troco)">Dinheiro</option>
-                  </select>
-                  <input type="text" placeholder="Observações (ex: tirar cebola)" value={orderNotes} onChange={(e) => setOrderNotes(e.target.value)} style={{ width: "100%", padding: "10px", borderRadius: "6px", border: "1px solid #CBD5E1", fontSize: "13px" }} />
-                </div>
+                    <div style={{ display: "flex", alignItems: "center", gap: "8px" }}>
+                      <button onClick={() => updateQuantity(item.ad.id, -1)} style={{ width: "28px", height: "28px", borderRadius: "50%", border: "1px solid #CBD5E1", background: "#F8FAFC", cursor: "pointer", fontWeight: "bold" }}>-</button>
+                      <span style={{ fontWeight: "bold", fontSize: "14px", color: "#1E293B" }}>{item.quantity}</span>
+                      <button onClick={() => updateQuantity(item.ad.id, 1)} style={{ width: "28px", height: "28px", borderRadius: "50%", border: "1px solid #CBD5E1", background: "#F8FAFC", cursor: "pointer", fontWeight: "bold" }}>+</button>
+                      <button onClick={() => removeFromCart(item.ad.id)} style={{ background: "none", border: "none", color: "#EF4444", marginLeft: "4px", cursor: "pointer", fontSize: "16px" }} title="Remover item">🗑️</button>
+                    </div>
+                  </div>
+                ))
               )}
             </div>
 
-            {/* BOTÃO FIXADO DE FINALIZAR PEDIDO */}
+            {/* DADOS DA ENTREGA */}
             {cart.length > 0 && (
-              <div style={{ borderTop: "2px solid #E2E8F0", paddingTop: "15px", marginTop: "auto", paddingBottom: "10px", backgroundColor: "#fff" }}>
+              <div style={{ marginTop: "25px", marginBottom: "30px", display: "flex", flexDirection: "column", gap: "12px" }}>
+                <h3 style={{ fontSize: "15px", margin: 0, color: "#1E293B" }}>📋 Dados da Entrega</h3>
+                <input type="text" placeholder="Seu Nome" value={customerName} onChange={(e) => setCustomerName(e.target.value)} style={{ width: "100%", padding: "10px", borderRadius: "6px", border: "1px solid #CBD5E1", fontSize: "13px" }} />
+                <input type="text" placeholder="Endereço de Entrega (Rua, Nº, Bairro)" value={customerAddress} onChange={(e) => setCustomerAddress(e.target.value)} style={{ width: "100%", padding: "10px", borderRadius: "6px", border: "1px solid #CBD5E1", fontSize: "13px" }} />
+                <select value={paymentMethod} onChange={(e) => setPaymentMethod(e.target.value)} style={{ width: "100%", padding: "10px", borderRadius: "6px", border: "1px solid #CBD5E1", fontSize: "13px" }}>
+                  <option value="Pix">Pix</option>
+                  <option value="Cartão de Crédito/Débito">Cartão de Crédito/Débito</option>
+                  <option value="Dinheiro (com troco)">Dinheiro</option>
+                </select>
+                <input type="text" placeholder="Observações (ex: tirar cebola)" value={orderNotes} onChange={(e) => setOrderNotes(e.target.value)} style={{ width: "100%", padding: "10px", borderRadius: "6px", border: "1px solid #CBD5E1", fontSize: "13px" }} />
+              </div>
+            )}
+
+            {/* BOTÃO FIXADO DE FINALIZAR PEDIDO (Com espaço livre para rolagem suave) */}
+            {cart.length > 0 && (
+              <div style={{ borderTop: "2px solid #E2E8F0", paddingTop: "15px", marginTop: "auto", paddingBottom: "25px", backgroundColor: "#fff" }}>
                 <div style={{ display: "flex", justifyContent: "space-between", marginBottom: "12px", fontSize: "18px", fontWeight: "bold", color: "#1E293B" }}>
                   <span>Total:</span>
                   <span style={{ color: theme.primary }}>R$ {cartTotal.toFixed(2)}</span>
