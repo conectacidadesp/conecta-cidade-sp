@@ -250,8 +250,10 @@ function ShopContent() {
         {/* Header da Loja com Bloco de Destaque Adaptativo */}
         <div style={{ 
           display: "flex", 
+          flexWrap: "wrap",
           alignItems: "center", 
           justifyContent: "space-between", 
+          gap: "15px",
           marginBottom: "30px", 
           backgroundColor: activeThemeKey === "darkGold" ? "#27272A" : `${theme.primary}12`,
           border: `1px solid ${theme.primary}33`,
@@ -262,23 +264,25 @@ function ShopContent() {
           zIndex: 2,
           boxShadow: "0 4px 15px rgba(0,0,0,0.05)"
         }}>
-          <div style={{ display: "flex", alignItems: "center", gap: "20px" }}>
+          <div style={{ display: "flex", alignItems: "center", gap: "20px", flex: 1, minWidth: "250px" }}>
             {profile?.logo_url ? (
-              <img src={profile.logo_url} alt={profile.store_name} style={{ width: "80px", height: "80px", borderRadius: "50%", objectFit: "cover", boxShadow: "0 4px 10px rgba(0,0,0,0.2)", border: `3px solid ${theme.bg}` }} />
+              <img src={profile.logo_url} alt={profile.store_name} style={{ width: "80px", height: "80px", minWidth: "80px", borderRadius: "50%", objectFit: "cover", boxShadow: "0 4px 10px rgba(0,0,0,0.2)", border: `3px solid ${theme.bg}` }} />
             ) : (
-              <div style={{ width: "80px", height: "80px", borderRadius: "50%", backgroundColor: theme.primary, color: "#fff", display: "flex", alignItems: "center", justifyContent: "center", fontSize: "28px", fontWeight: "bold", border: `3px solid ${theme.bg}` }}>
+              <div style={{ width: "80px", height: "80px", minWidth: "80px", borderRadius: "50%", backgroundColor: theme.primary, color: "#fff", display: "flex", alignItems: "center", justifyContent: "center", fontSize: "28px", fontWeight: "bold", border: `3px solid ${theme.bg}` }}>
                 {profile?.store_name?.charAt(0).toUpperCase() || "L"}
               </div>
             )}
-            <div>
-              <h1 style={{ fontSize: "28px", margin: 0, color: theme.primary, fontWeight: "bold" }}>{profile?.store_name || "Vitrine da Loja"}</h1>
-              <p style={{ color: theme.text, opacity: 0.8, margin: "5px 0 0 0", fontSize: "14px" }}>
+            <div style={{ overflow: "hidden", flex: 1 }}>
+              <h1 style={{ fontSize: "24px", margin: 0, color: theme.primary, fontWeight: "bold", whiteSpace: "normal", wordBreak: "break-word" }}>
+                {profile?.store_name || "Vitrine da Loja"}
+              </h1>
+              <p style={{ color: theme.text, opacity: 0.8, margin: "5px 0 0 0", fontSize: "13px", lineHeight: "1.3" }}>
                 {isFoodMode ? "🍔 Faça seu pedido online no nosso cardápio virtual!" : "Confira todo o nosso estoque virtual ativo abaixo"}
               </p>
             </div>
           </div>
 
-          <span style={{ backgroundColor: theme.primary, color: "#fff", fontSize: "12px", fontWeight: "bold", padding: "8px 14px", borderRadius: "20px", boxShadow: "0 2px 8px rgba(0,0,0,0.15)" }}>
+          <span style={{ backgroundColor: theme.primary, color: "#fff", fontSize: "12px", fontWeight: "bold", padding: "8px 14px", borderRadius: "20px", boxShadow: "0 2px 8px rgba(0,0,0,0.15)", whiteSpace: "nowrap" }}>
             {isFoodMode ? "🍟 Modo Delivery & Cardápio" : "🛍️ Modo Loja / Marketplace"}
           </span>
         </div>
@@ -327,7 +331,7 @@ function ShopContent() {
                         {displayItems.map((ad, idx) => {
                           const isHighlighted = ad.id === highlightedAdId;
 
-                          // Mensagem detalhada para o WhatsApp no modo Marketplace (com nome, preço, descrição e link da foto)
+                          // Mensagem detalhada para o WhatsApp no modo Marketplace
                           const marketMessage = `🚀 *Olá! Estou vindo do ConectaCidadeSp e tenho interesse neste produto:*\n\n` +
                             `📦 *${ad.title}*\n` +
                             `💰 *Preço:* ${ad.price ? `R$ ${ad.price.toFixed(2)}` : "A combinar"}\n` +
@@ -453,7 +457,7 @@ function ShopContent() {
       {/* MODAL / GAVETA DO CARRINHO */}
       {isCartOpen && (
         <div style={{ position: "fixed", top: 0, left: 0, width: "100vw", height: "100vh", backgroundColor: "rgba(0,0,0,0.6)", zIndex: 9999, display: "flex", justifyContent: "flex-end" }}>
-          <div style={{ width: "100%", maxWidth: "420px", backgroundColor: "#fff", height: "100%", padding: "20px", display: "flex", flexDirection: "column", justifyContent: "space-between", overflowY: "auto" }}>
+          <div style={{ width: "100%", maxWidth: "420px", backgroundColor: "#fff", height: "100%", padding: "20px", paddingBottom: "40px", display: "flex", flexDirection: "column", justifyContent: "space-between", overflowY: "auto" }}>
             <div>
               <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", borderBottom: "1px solid #E2E8F0", paddingBottom: "15px" }}>
                 <h2 style={{ fontSize: "20px", margin: 0, color: "#1E293B" }}>🛍️ Seu Pedido</h2>
@@ -484,7 +488,7 @@ function ShopContent() {
 
               {/* DADOS DA ENTREGA */}
               {cart.length > 0 && (
-                <div style={{ marginTop: "25px", display: "flex", flexDirection: "column", gap: "12px" }}>
+                <div style={{ marginTop: "25px", marginBottom: "20px", display: "flex", flexDirection: "column", gap: "12px" }}>
                   <h3 style={{ fontSize: "15px", margin: 0, color: "#1E293B" }}>📋 Dados da Entrega</h3>
                   <input type="text" placeholder="Seu Nome" value={customerName} onChange={(e) => setCustomerName(e.target.value)} style={{ width: "100%", padding: "10px", borderRadius: "6px", border: "1px solid #CBD5E1", fontSize: "13px" }} />
                   <input type="text" placeholder="Endereço de Entrega (Rua, Nº, Bairro)" value={customerAddress} onChange={(e) => setCustomerAddress(e.target.value)} style={{ width: "100%", padding: "10px", borderRadius: "6px", border: "1px solid #CBD5E1", fontSize: "13px" }} />
@@ -500,8 +504,8 @@ function ShopContent() {
 
             {/* BOTÃO FIXADO DE FINALIZAR PEDIDO */}
             {cart.length > 0 && (
-              <div style={{ borderTop: "2px solid #E2E8F0", paddingTop: "15px", marginTop: "20px" }}>
-                <div style={{ display: "flex", justifyContent: "space-between", marginBottom: "15px", fontSize: "18px", fontWeight: "bold", color: "#1E293B" }}>
+              <div style={{ borderTop: "2px solid #E2E8F0", paddingTop: "15px", marginTop: "auto", paddingBottom: "10px", backgroundColor: "#fff" }}>
+                <div style={{ display: "flex", justifyContent: "space-between", marginBottom: "12px", fontSize: "18px", fontWeight: "bold", color: "#1E293B" }}>
                   <span>Total:</span>
                   <span style={{ color: theme.primary }}>R$ {cartTotal.toFixed(2)}</span>
                 </div>
