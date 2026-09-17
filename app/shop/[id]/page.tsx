@@ -38,14 +38,6 @@ const THEMES: Record<string, { primary: string; bg: string; text: string; accent
   rose: { primary: "#E11D48", bg: "#FFF1F2", text: "#881337", accent: "#F43F5E" },
 };
 
-function chunkArray<T>(array: T[], size: number): T[][] {
-  const chunks: T[][] = [];
-  for (let i = 0; i < array.length; i += size) {
-    chunks.push(array.slice(i, i + size));
-  }
-  return chunks;
-}
-
 function ShopContent() {
   const params = useParams();
   const searchParams = useSearchParams();
@@ -68,6 +60,7 @@ function ShopContent() {
 
   const targetAdRef = useRef<HTMLDivElement | null>(null);
   const scrollRefs = useRef<{ [key: string]: HTMLDivElement | null }>({});
+  const isInteractingRef = useRef<{ [key: string]: boolean }>({});
 
   useEffect(() => {
     async function loadShopData() {
@@ -77,7 +70,6 @@ function ShopContent() {
       let storeUserId = rawId;
       let adIdToHighlight = targetAdQuery;
 
-      // Busca anúncio direto para identificar o dono da loja
       const { data: directAd } = await supabase
         .from("ads")
         .select("*")
@@ -91,7 +83,6 @@ function ShopContent() {
 
       setHighlightedAdId(adIdToHighlight);
 
-      // Busca o perfil do usuário
       const { data: profileData, error: profileError } = await supabase
         .from("profiles")
         .select("*")
@@ -102,7 +93,6 @@ function ShopContent() {
         setProfile(profileData);
       }
 
-      // Busca anúncios ativos (ignorando os ocultos: is_hidden IS NOT TRUE)
       const { data: adsData } = await supabase
         .from("ads")
         .select("*")
@@ -126,20 +116,37 @@ function ShopContent() {
     loadShopData();
   }, [rawId, targetAdQuery]);
 
+  // Efeito para o carrossel se mover sozinho suavemente e voltar ao início ao chegar no fim
+  useEffect(() => {
+    const interval = setInterval(() => {
+      Object.keys(scrollRefs.current).forEach((key) => {
+        const container = scrollRefs.current[key];
+        if (container && !isInteractingRef.current[key]) {
+          const maxScrollLeft = container.scrollWidth - container.clientWidth;
+          if (container.scrollLeft >= maxScrollLeft - 5) {
+            container.scrollTo({ left: 0, behavior: "smooth" });
+          } else {
+            container.scrollBy({ left: 280, behavior: "smooth" });
+          }
+        }
+      });
+    }, 3500);
+
+    return () => clearInterval(interval);
+  }, [ads]);
+
   const activeThemeKey = profile?.theme_color && THEMES[profile.theme_color] ? profile.theme_color : "blue";
   const theme = THEMES[activeThemeKey];
   const isFoodMode = profile?.store_type === "food";
 
-  // Funções de rolagem lateral com as setinhas no PC
   const scrollCategory = (categoryKey: string, direction: "left" | "right") => {
     const container = scrollRefs.current[categoryKey];
     if (container) {
-      const scrollAmount = direction === "left" ? -400 : 400;
+      const scrollAmount = direction === "left" ? -300 : 300;
       container.scrollBy({ left: scrollAmount, behavior: "smooth" });
     }
   };
 
-  // Funções do Carrinho
   const addToCart = (ad: Ad) => {
     setCart((prev) => {
       const existingIndex = prev.findIndex((item) => item.ad.id === ad.id);
@@ -221,11 +228,11 @@ function ShopContent() {
           scroll-snap-type: x mandatory;
           -webkit-overflow-scrolling: touch;
           padding-bottom: 10px;
-          scrollbar-width: none; /* Firefox */
+          scrollbar-width: none;
         }
 
         .scroll-container::-webkit-scrollbar {
-          display: none; /* Chrome, Safari, Opera */
+          display: none;
         }
 
         .scroll-item {
@@ -260,7 +267,7 @@ function ShopContent() {
       )}
 
       <main style={{ maxWidth: "1200px", margin: "0 auto", padding: "0 20px", overflow: "hidden" }}>
-        {/* Header da Loja com Bloco de Destaque Adaptativo */}
+        {/* Header da Loja */}
         <div style={{ 
           display: "flex", 
           flexWrap: "wrap",
@@ -309,7 +316,7 @@ function ShopContent() {
 
             return (
               <div key={category} style={{ marginBottom: "40px" }}>
-                <div style={{ display: "flex", alignItems: "center", justifyContent: "between", marginBottom: "18px" }}>
+                <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: "18px" }}>
                   <div style={{ display: "flex", alignItems: "center", gap: "10px", flex: 1 }}>
                     <h2 style={{ fontSize: "20px", fontWeight: "bold", color: theme.primary, margin: 0 }}>
                       {category}
@@ -319,7 +326,7 @@ function ShopContent() {
                     </span>
                   </div>
 
-                  {/* Botões de navegação lateral (Aparecem elegantes no computador) */}
+                  {/* Botões de navegação lateral para PC */}
                   <div style={{ display: "flex", gap: "8px" }}>
                     <button
                       onClick={() => scrollCategory(categoryKey, "left")}
@@ -366,10 +373,16 @@ function ShopContent() {
                   </div>
                 </div>
 
-                {/* Container com Scroll por Toque Nativo e referência para as setas */}
+                {/* Carrossel com rolagem automática + toque livre */}
                 <div 
                   className="scroll-container"
                   ref={(el) => { scrollRefs.current[categoryKey] = el; }}
+                  onMouseEnter={() => { isInteractingRef.current[categoryKey] = true; }}
+                  onMouseLeave={() => { isInteractingRef.current[categoryKey] = false; }}
+                  onTouchStart={() => { isInteractingRef.current[categoryKey] = true; }}
+                  onTouchEnd={() => { 
+                    setTimeout(() => { isInteractingRef.current[categoryKey] = false; }, 3000); 
+                  }}
                 >
                   {items.map((ad, idx) => {
                     const isHighlighted = ad.id === highlightedAdId;
