@@ -67,6 +67,7 @@ function ShopContent() {
   const [orderNotes, setOrderNotes] = useState("");
 
   const targetAdRef = useRef<HTMLDivElement | null>(null);
+  const scrollRefs = useRef<{ [key: string]: HTMLDivElement | null }>({});
 
   useEffect(() => {
     async function loadShopData() {
@@ -128,6 +129,15 @@ function ShopContent() {
   const activeThemeKey = profile?.theme_color && THEMES[profile.theme_color] ? profile.theme_color : "blue";
   const theme = THEMES[activeThemeKey];
   const isFoodMode = profile?.store_type === "food";
+
+  // Funções de rolagem lateral com as setinhas no PC
+  const scrollCategory = (categoryKey: string, direction: "left" | "right") => {
+    const container = scrollRefs.current[categoryKey];
+    if (container) {
+      const scrollAmount = direction === "left" ? -400 : 400;
+      container.scrollBy({ left: scrollAmount, behavior: "smooth" });
+    }
+  };
 
   // Funções do Carrinho
   const addToCart = (ad: Ad) => {
@@ -204,20 +214,23 @@ function ShopContent() {
   return (
     <div style={{ minHeight: "100vh", backgroundColor: theme.bg, color: theme.text, paddingBottom: "100px" }}>
       <style jsx global>{`
-        @keyframes scrollInfinite {
-          0% { transform: translateX(0); }
-          100% { transform: translateX(-50%); }
-        }
-
-        .carousel-track {
+        .scroll-container {
           display: flex;
           gap: 20px;
-          width: max-content;
-          animation: scrollInfinite 25s linear infinite;
+          overflow-x: auto;
+          scroll-snap-type: x mandatory;
+          -webkit-overflow-scrolling: touch;
+          padding-bottom: 10px;
+          scrollbar-width: none; /* Firefox */
         }
 
-        .carousel-container:hover .carousel-track {
-          animation-play-state: paused;
+        .scroll-container::-webkit-scrollbar {
+          display: none; /* Chrome, Safari, Opera */
+        }
+
+        .scroll-item {
+          scroll-snap-align: start;
+          flex-shrink: 0;
         }
 
         .title-clamp {
@@ -292,134 +305,161 @@ function ShopContent() {
           <p style={{ color: "#64748B" }}>Esta loja ainda não publicou produtos no estoque.</p>
         ) : (
           Object.entries(groupedAds).map(([category, items]) => {
-            const rows = chunkArray(items, 10);
+            const categoryKey = category.replace(/\s+/g, "-").toLowerCase();
 
             return (
               <div key={category} style={{ marginBottom: "40px" }}>
-                <div style={{ display: "flex", alignItems: "center", gap: "10px", marginBottom: "18px" }}>
-                  <h2 style={{ fontSize: "20px", fontWeight: "bold", color: theme.primary, margin: 0 }}>
-                    {category}
-                  </h2>
-                  <span style={{ fontSize: "12px", backgroundColor: `${theme.primary}15`, color: theme.primary, padding: "2px 8px", borderRadius: "12px", fontWeight: "bold" }}>
-                    {items.length} {items.length === 1 ? "item" : "itens"}
-                  </span>
+                <div style={{ display: "flex", alignItems: "center", justifyContent: "between", marginBottom: "18px" }}>
+                  <div style={{ display: "flex", alignItems: "center", gap: "10px", flex: 1 }}>
+                    <h2 style={{ fontSize: "20px", fontWeight: "bold", color: theme.primary, margin: 0 }}>
+                      {category}
+                    </h2>
+                    <span style={{ fontSize: "12px", backgroundColor: `${theme.primary}15`, color: theme.primary, padding: "2px 8px", borderRadius: "12px", fontWeight: "bold" }}>
+                      {items.length} {items.length === 1 ? "item" : "itens"}
+                    </span>
+                  </div>
+
+                  {/* Botões de navegação lateral (Aparecem elegantes no computador) */}
+                  <div style={{ display: "flex", gap: "8px" }}>
+                    <button
+                      onClick={() => scrollCategory(categoryKey, "left")}
+                      style={{
+                        width: "32px",
+                        height: "32px",
+                        borderRadius: "50%",
+                        border: `1px solid ${theme.primary}44`,
+                        backgroundColor: "#fff",
+                        color: theme.primary,
+                        fontSize: "14px",
+                        fontWeight: "bold",
+                        cursor: "pointer",
+                        display: "flex",
+                        alignItems: "center",
+                        justifyContent: "center",
+                        boxShadow: "0 2px 5px rgba(0,0,0,0.05)"
+                      }}
+                      title="Anterior"
+                    >
+                      ❮
+                    </button>
+                    <button
+                      onClick={() => scrollCategory(categoryKey, "right")}
+                      style={{
+                        width: "32px",
+                        height: "32px",
+                        borderRadius: "50%",
+                        border: `1px solid ${theme.primary}44`,
+                        backgroundColor: "#fff",
+                        color: theme.primary,
+                        fontSize: "14px",
+                        fontWeight: "bold",
+                        cursor: "pointer",
+                        display: "flex",
+                        alignItems: "center",
+                        justifyContent: "center",
+                        boxShadow: "0 2px 5px rgba(0,0,0,0.05)"
+                      }}
+                      title="Próximo"
+                    >
+                      ❯
+                    </button>
+                  </div>
                 </div>
 
-                {rows.map((rowItems, rowIndex) => {
-                  const displayItems = rowItems.length > 1 ? [...rowItems, ...rowItems] : rowItems;
+                {/* Container com Scroll por Toque Nativo e referência para as setas */}
+                <div 
+                  className="scroll-container"
+                  ref={(el) => { scrollRefs.current[categoryKey] = el; }}
+                >
+                  {items.map((ad, idx) => {
+                    const isHighlighted = ad.id === highlightedAdId;
 
-                  return (
-                    <div
-                      key={`${category}-row-${rowIndex}`}
-                      className="carousel-container"
-                      style={{
-                        width: "100%",
-                        overflow: "hidden",
-                        paddingBottom: "15px",
-                        marginBottom: rowIndex < rows.length - 1 ? "25px" : "0",
-                      }}
-                    >
+                    const marketMessage = `🚀 *Olá! Estou vindo do ConectaCidadeSp e tenho interesse neste produto:*\n\n` +
+                      `📦 *${ad.title}*\n` +
+                      `💰 *Preço:* ${ad.price ? `R$ ${ad.price.toFixed(2)}` : "A combinar"}\n` +
+                      `📝 *Detalhes:* ${ad.description || "Sem descrição"}\n` +
+                      (ad.image_url ? `\n🖼️ *Foto do produto:* ${ad.image_url}` : "");
+
+                    return (
                       <div
-                        className={rowItems.length > 1 ? "carousel-track" : ""}
+                        key={`${ad.id}-${idx}`}
+                        className="scroll-item"
+                        ref={isHighlighted && idx === 0 ? targetAdRef : null}
                         style={{
+                          minWidth: "260px",
+                          maxWidth: "260px",
+                          border: isHighlighted ? `3px solid ${theme.primary}` : "1px solid #E2E8F0",
+                          borderRadius: "12px",
+                          overflow: "hidden",
+                          backgroundColor: "#fff",
                           display: "flex",
-                          gap: "20px",
-                          width: rowItems.length > 1 ? "max-content" : "100%",
-                          animationDuration: `${Math.max(rowItems.length * 5, 15)}s`,
+                          flexDirection: "column",
+                          justifyContent: "space-between",
+                          boxShadow: isHighlighted ? "0 8px 25px rgba(0,0,0,0.15)" : "0 2px 5px rgba(0,0,0,0.04)",
+                          transform: isHighlighted ? "scale(1.02)" : "scale(1)",
+                          transition: "all 0.3s ease",
+                          position: "relative",
                         }}
                       >
-                        {displayItems.map((ad, idx) => {
-                          const isHighlighted = ad.id === highlightedAdId;
+                        {isHighlighted && (
+                          <span style={{ position: "absolute", top: 10, left: 10, backgroundColor: theme.primary, color: "#fff", fontSize: "10px", fontWeight: "bold", padding: "4px 8px", borderRadius: "6px", zIndex: 1 }}>
+                            ⚡ Em Destaque
+                          </span>
+                        )}
 
-                          const marketMessage = `🚀 *Olá! Estou vindo do ConectaCidadeSp e tenho interesse neste produto:*\n\n` +
-                            `📦 *${ad.title}*\n` +
-                            `💰 *Preço:* ${ad.price ? `R$ ${ad.price.toFixed(2)}` : "A combinar"}\n` +
-                            `📝 *Detalhes:* ${ad.description || "Sem descrição"}\n` +
-                            (ad.image_url ? `\n🖼️ *Foto do produto:* ${ad.image_url}` : "");
+                        <div>
+                          {ad.image_url ? (
+                            <img src={ad.image_url} alt={ad.title} style={{ width: "100%", height: "180px", objectFit: "cover" }} />
+                          ) : (
+                            <div style={{ width: "100%", height: "180px", backgroundColor: "#F1F5F9", display: "flex", alignItems: "center", justifyContent: "center", color: "#94A3B8" }}>📷 Sem Foto</div>
+                          )}
+                          <div style={{ padding: "14px" }}>
+                            <h3 className="title-clamp" style={{ fontSize: "15px", fontWeight: "bold", margin: "5px 0", color: "#1E293B", lineHeight: "1.3", height: "39px" }}>
+                              {ad.title}
+                            </h3>
+                            <p className="desc-clamp" style={{ fontSize: "13px", color: "#64748B", margin: "5px 0 0 0", lineHeight: "1.3", height: "34px" }}>
+                              {ad.description}
+                            </p>
+                          </div>
+                        </div>
 
-                          return (
-                            <div
-                              key={`${ad.id}-${idx}`}
-                              ref={isHighlighted && idx === 0 ? targetAdRef : null}
+                        <div style={{ padding: "14px", paddingTop: 0 }}>
+                          <p style={{ fontSize: "18px", fontWeight: "bold", color: theme.primary, margin: "10px 0" }}>
+                            {ad.price ? `R$ ${ad.price.toFixed(2)}` : "Combinar valor"}
+                          </p>
+
+                          {isFoodMode ? (
+                            <button
+                              onClick={() => addToCart(ad)}
                               style={{
-                                minWidth: "260px",
-                                maxWidth: "260px",
-                                flexShrink: 0,
-                                border: isHighlighted ? `3px solid ${theme.primary}` : "1px solid #E2E8F0",
-                                borderRadius: "12px",
-                                overflow: "hidden",
-                                backgroundColor: "#fff",
-                                display: "flex",
-                                flexDirection: "column",
-                                justifyContent: "space-between",
-                                boxShadow: isHighlighted ? "0 8px 25px rgba(0,0,0,0.15)" : "0 2px 5px rgba(0,0,0,0.04)",
-                                transform: isHighlighted ? "scale(1.02)" : "scale(1)",
-                                transition: "all 0.3s ease",
-                                position: "relative",
+                                width: "100%",
+                                padding: "10px",
+                                backgroundColor: theme.primary,
+                                color: "#fff",
+                                border: "none",
+                                borderRadius: "8px",
+                                fontWeight: "bold",
+                                fontSize: "12px",
+                                cursor: "pointer",
                               }}
                             >
-                              {isHighlighted && (
-                                <span style={{ position: "absolute", top: 10, left: 10, backgroundColor: theme.primary, color: "#fff", fontSize: "10px", fontWeight: "bold", padding: "4px 8px", borderRadius: "6px", zIndex: 1 }}>
-                                  ⚡ Em Destaque
-                                </span>
-                              )}
-
-                              <div>
-                                {ad.image_url ? (
-                                  <img src={ad.image_url} alt={ad.title} style={{ width: "100%", height: "180px", objectFit: "cover" }} />
-                                ) : (
-                                  <div style={{ width: "100%", height: "180px", backgroundColor: "#F1F5F9", display: "flex", alignItems: "center", justifyContent: "center", color: "#94A3B8" }}>📷 Sem Foto</div>
-                                )}
-                                <div style={{ padding: "14px" }}>
-                                  <h3 className="title-clamp" style={{ fontSize: "15px", fontWeight: "bold", margin: "5px 0", color: "#1E293B", lineHeight: "1.3", height: "39px" }}>
-                                    {ad.title}
-                                  </h3>
-                                  <p className="desc-clamp" style={{ fontSize: "13px", color: "#64748B", margin: "5px 0 0 0", lineHeight: "1.3", height: "34px" }}>
-                                    {ad.description}
-                                  </p>
-                                </div>
-                              </div>
-
-                              <div style={{ padding: "14px", paddingTop: 0 }}>
-                                <p style={{ fontSize: "18px", fontWeight: "bold", color: theme.primary, margin: "10px 0" }}>
-                                  {ad.price ? `R$ ${ad.price.toFixed(2)}` : "Combinar valor"}
-                                </p>
-
-                                {isFoodMode ? (
-                                  <button
-                                    onClick={() => addToCart(ad)}
-                                    style={{
-                                      width: "100%",
-                                      padding: "10px",
-                                      backgroundColor: theme.primary,
-                                      color: "#fff",
-                                      border: "none",
-                                      borderRadius: "8px",
-                                      fontWeight: "bold",
-                                      fontSize: "12px",
-                                      cursor: "pointer",
-                                    }}
-                                  >
-                                    🛒 Adicionar ao Pedido
-                                  </button>
-                                ) : (
-                                  <a
-                                    href={`https://wa.me/55${ad.whatsapp ? ad.whatsapp.replace(/\D/g, "") : ""}?text=${encodeURIComponent(marketMessage)}`}
-                                    target="_blank"
-                                    rel="noopener noreferrer"
-                                    style={{ display: "block", textAlign: "center", padding: "10px", backgroundColor: "#22C55E", color: "#fff", borderRadius: "8px", textDecoration: "none", fontWeight: "bold", fontSize: "12px" }}
-                                  >
-                                    💬 Perguntar sobre este produto
-                                  </a>
-                                )}
-                              </div>
-                            </div>
-                          );
-                        })}
+                              🛒 Adicionar ao Pedido
+                            </button>
+                          ) : (
+                            <a
+                              href={`https://wa.me/55${ad.whatsapp ? ad.whatsapp.replace(/\D/g, "") : ""}?text=${encodeURIComponent(marketMessage)}`}
+                              target="_blank"
+                              rel="noopener noreferrer"
+                              style={{ display: "block", textAlign: "center", padding: "10px", backgroundColor: "#22C55E", color: "#fff", borderRadius: "8px", textDecoration: "none", fontWeight: "bold", fontSize: "12px" }}
+                            >
+                              💬 Perguntar sobre este produto
+                            </a>
+                          )}
+                        </div>
                       </div>
-                    </div>
-                  );
-                })}
+                    );
+                  })}
+                </div>
               </div>
             );
           })
@@ -453,7 +493,7 @@ function ShopContent() {
         </div>
       )}
 
-      {/* MODAL / GAVETA DO CARRINHO (Com scroll livre e respiro extra embaixo para mobile) */}
+      {/* MODAL / GAVETA DO CARRINHO */}
       {isCartOpen && (
         <div style={{ position: "fixed", top: 0, left: 0, width: "100vw", height: "100vh", backgroundColor: "rgba(0,0,0,0.6)", zIndex: 9999, display: "flex", justifyContent: "flex-end" }}>
           <div style={{ width: "100%", maxWidth: "420px", backgroundColor: "#fff", height: "100%", padding: "20px", paddingBottom: "80px", display: "flex", flexDirection: "column", overflowY: "auto" }}>
@@ -499,7 +539,7 @@ function ShopContent() {
               </div>
             )}
 
-            {/* BOTÃO FIXADO DE FINALIZAR PEDIDO (Com espaço livre para rolagem suave) */}
+            {/* BOTÃO FIXADO DE FINALIZAR PEDIDO */}
             {cart.length > 0 && (
               <div style={{ borderTop: "2px solid #E2E8F0", paddingTop: "15px", marginTop: "auto", paddingBottom: "25px", backgroundColor: "#fff" }}>
                 <div style={{ display: "flex", justifyContent: "space-between", marginBottom: "12px", fontSize: "18px", fontWeight: "bold", color: "#1E293B" }}>
