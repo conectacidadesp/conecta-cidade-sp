@@ -63,26 +63,22 @@ export default function Header() {
   }
 
   return (
-    <header style={{ backgroundColor: "#0F4C81", color: "#fff", padding: "10px 20px" }}>
+    <header style={{ backgroundColor: "#0F4C81", color: "#fff", padding: "12px 20px" }}>
       <div style={{ maxWidth: 1100, margin: "0 auto", display: "flex", justifyContent: "space-between", alignItems: "center", flexWrap: "wrap", gap: 10 }}>
         
-        {/* LOGO OFICIAL EM IMAGEM */}
+        {/* LOGO BEM GRANDONA E VISÍVEL */}
         <Link 
           href="/" 
           style={{ 
             display: "flex", 
             alignItems: "center", 
-            backgroundColor: "#ffffff", 
-            padding: "6px 12px", 
-            borderRadius: "8px", 
-            boxShadow: "0 2px 4px rgba(0,0,0,0.15)",
             textDecoration: "none" 
           }}
         >
           <img 
-            src="/logo.png" 
+            src="https://ahiyxrdplhecskzoiogd.supabase.co/storage/v1/object/public/site-assets/Logo.png" 
             alt="Conecta Cidade SP" 
-            style={{ height: "36px", width: "auto", objectFit: "contain" }} 
+            style={{ height: "60px", width: "auto", objectFit: "contain", display: "block" }} 
           />
         </Link>
 
@@ -180,10 +176,10 @@ export default function Header() {
               backgroundColor: "#22C55E",
               color: "#fff",
               textDecoration: "none",
-              fontSize: 13,
+              fontSize: "13px",
               fontWeight: "bold",
               padding: "6px 14px",
-              borderRadius: 6
+              borderRadius: "6px"
             }}
           >
             📢 Criar Anúncio

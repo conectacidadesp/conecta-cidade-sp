@@ -3,6 +3,11 @@ import Header from "@/components/Header";
 export const metadata = {
   title: "Conecta Cidade SP",
   description: "Classificados da sua cidade",
+  icons: {
+    icon: "https://ahiyxrdplhecskzoiogd.supabase.co/storage/v1/object/public/site-assets/Logo%20redonda.png",
+    shortcut: "https://ahiyxrdplhecskzoiogd.supabase.co/storage/v1/object/public/site-assets/Logo%20redonda.png",
+    apple: "https://ahiyxrdplhecskzoiogd.supabase.co/storage/v1/object/public/site-assets/Logo%20redonda.png",
+  },
 };
 
 export default function RootLayout({
