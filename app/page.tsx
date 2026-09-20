@@ -243,11 +243,15 @@ export default function Home() {
     const isFoodStore = storeProfile?.store_type === "food";
 
     const formattedPrice = ad.price ? `R$ ${ad.price.toFixed(2)}` : "A combinar";
+    
+    // Inclui a URL da foto do produto na mensagem do WhatsApp se ela existir
+    const imageText = ad.image_url ? `\n🖼️ Foto do produto: ${ad.image_url}` : "";
+
     const whatsappMessage = `🚀 Estou vindo do ConectaCidadeSp e tenho interesse neste produto:
 
 📦 ${ad.title}
 💰 Preço: ${formattedPrice}
-📝 Detalhes: ${ad.description}`;
+📝 Detalhes: ${ad.description}${imageText}`;
 
     return (
       <div key={ad.id} style={{ 

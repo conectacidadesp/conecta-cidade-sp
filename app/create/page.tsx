@@ -4,55 +4,51 @@ import { useState, useEffect } from "react";
 import { supabase } from "@/lib/supabase";
 import { useRouter } from "next/navigation";
 
-// 📂 Dicionário de Categorias e Subcategorias com Emojis Compatíveis e Universais
+// 📂 Dicionário de Categorias e Subcategorias Atualizado e Sem Duplicidades
 const categoriesData: Record<string, { icon: string; subs: string[] }> = {
-  "Produtos": {
-    icon: "🎁", 
-    subs: ["Celulares", "Notebooks", "TVs", "Videogames", "Áudio e Som", "Informática", "Roupas e Calçados", "Livros e Revistas", "Beleza e Saúde", "Outros"]
+  "Imóveis": {
+    icon: "🏠",
+    subs: ["Venda de Imóveis", "Aluguel Residencial", "Aluguel Comercial", "Temporada e Chácaras", "Terrenos e Lotes"]
   },
   "Veículos": {
     icon: "🚗",
-    subs: ["Carros", "Motos", "Caminhões", "Peças e Acessórios"]
+    subs: ["Carros", "Motos", "Caminhões e Utilitários", "Peças e Acessórios"]
   },
-  "Casa e Jardim": {
-    icon: "🏡",
-    subs: ["Móveis", "Eletrodomésticos", "Decoração", "Ferramentas"]
+  "Serviços Profissionais": {
+    icon: "🛠️",
+    subs: ["Reformas e Construção (Pedreiro, Pintor)", "Elétrica e Hidráulica", "Manutenção e Informática", "Limpeza e Jardinagem", "Outros Serviços"]
   },
-  "Moda e Beleza": {
-    icon: "👕",
-    subs: ["Roupas", "Calçados", "Cosméticos", "Acessórios"]
-  },
-  "Pets": {
-    icon: "🐾",
-    subs: ["Animais", "Acessórios", "Serviços Pet"]
-  },
-  "Casa e Construção": {
-    icon: "🏠", 
-    subs: ["Materiais de Construção", "Ferramentas", "Hidráulica", "Elétrica", "Madeiras", "Pintura", "Acabamentos"]
-  },
-  "Serviços": {
-    icon: "🔧", 
-    subs: ["Pedreiro", "Pintor", "Eletricista", "Encanador", "Jardineiro", "Faxina", "Informática"]
-  },
-  "Empregos": {
-    icon: "💼",
-    subs: ["Vagas", "Currículos", "Estágios"]
+  "Saúde e Bem-Estar": {
+    icon: "❤️",
+    subs: ["Clínicas e Consultórios", "Farmácias e Drograrias", "Academias e Personal", "Estética e Beleza"]
   },
   "Alimentação": {
     icon: "🍕", 
-    subs: ["Lanches", "Pizzarias", "Açaí", "Pastéis", "Marmitas", "Sorveterias", "Doces e Bolos", "Bebidas", "Restaurantes"]
+    subs: ["Restaurantes e Marmitas", "Lanches e Pizzarias", "Açaí, Sorveterias, Doces e Bolos", "Bebidas e Distribuidoras"]
   },
-  "Infantil": {
-    icon: "👶", 
-    subs: ["Brinquedos", "Jogos", "Material Escolar", "Roupas Infantis", "Carrinhos de Bebê", "Artigos para Bebês", "Presentes"]
+  "Comércio e Lojas (Produtos)": {
+    icon: "🛍️",
+    subs: ["Eletrônicos e Celulares", "Roupas, Calçados e Acessórios", "Móveis, Casa e Decoração", "Ferramentas e Materiais de Construção"]
   },
-  "Promoções": {
-    icon: "📢",
-    subs: ["Mercado", "Farmácia", "Loja de Roupas", "Comércio Local"]
+  "Infantil e Brinquedos": {
+    icon: "🧸", 
+    subs: ["Brinquedos e Jogos", "Roupas Infantis", "Artigos para Bebês", "Material Escolar"]
   },
-  "Eventos": {
+  "Pets": {
+    icon: "🐾",
+    subs: ["Animais de Estimação", "Ração e Alimentos", "Acessórios e Pet Shop", "Serviços Veterinários"]
+  },
+  "Empregos": {
+    icon: "💼",
+    subs: ["Vagas de Emprego", "Currículos", "Estágios", "Concursos"]
+  },
+  "Eventos, Lazer e Turismo": {
     icon: "📅",
-    subs: ["Rodeios", "Festas", "Esportes", "Eventos Comunitários"]
+    subs: ["Festas e Shows", "Rodeios e Eventos Regionais", "Esportes e Lazer", "Hotéis e Pousadas"]
+  },
+  "Promoções e Utilidade Pública": {
+    icon: "📢",
+    subs: ["Ofertas do Comércio Local", "Avisos e Utilidade Pública"]
   }
 };
 
@@ -118,13 +114,11 @@ export default function CreateAd() {
   
   const router = useRouter();
 
-  // 🏪 Estados para controlar o tipo e perfil do usuário logado
   const [userType, setUserType] = useState<string>("client");
   const [storeType, setStoreType] = useState<"marketplace" | "food">("marketplace");
   const [profileWhatsapp, setProfileWhatsapp] = useState("");
   const [loggedUserId, setLoggedUserId] = useState<string | null>(null);
 
-  // 🛡️ Proteção de Rota e Identificação de Perfil
   useEffect(() => {
     if (typeof window !== "undefined") {
       const savedCity = localStorage.getItem("selectedCity");
@@ -144,7 +138,6 @@ export default function CreateAd() {
 
       setLoggedUserId(user.id);
 
-      // Carrega os dados do perfil do usuário logado
       const { data: profile } = await supabase
         .from("profiles")
         .select("store_type, whatsapp, user_type")
@@ -156,7 +149,6 @@ export default function CreateAd() {
         setStoreType(profile.store_type || "marketplace");
         setProfileWhatsapp(profile.whatsapp || "");
         
-        // Se for loja do tipo Alimentação, pré-seleciona a categoria
         if (profile.user_type === "store" && profile.store_type === "food") {
           setCategory("Alimentação");
         }
@@ -217,7 +209,6 @@ export default function CreateAd() {
       }
     }
 
-    // Se for cliente, custom_category é null. Se for loja food, usa a subcategoria digitada.
     const customCategoryValue = (userType === "store" && storeType === "food") ? subcategory : null;
 
     const { error } = await supabase.from("ads").insert([
@@ -270,7 +261,6 @@ export default function CreateAd() {
             </select>
           </div>
 
-          {/* Renderização condicional rigorosa: Cardápio livre apenas se for Loja Food */}
           {userType === "store" && category && storeType === "food" ? (
             <div style={{ display: "flex", flexDirection: "column", gap: 5 }}>
               <label style={{ fontSize: 14, fontWeight: "bold", color: "#1E293B" }}>🍔 Categoria no Cardápio (Subcategoria):</label>
