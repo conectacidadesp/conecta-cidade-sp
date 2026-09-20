@@ -26,7 +26,6 @@ export default function MeusAnunciosPage() {
         return;
       }
 
-      // Busca apenas os anúncios do usuário logado
       const { data, error } = await supabase
         .from("ads")
         .select("*")
@@ -106,7 +105,23 @@ export default function MeusAnunciosPage() {
                 </p>
               </div>
 
-              <div style={{ display: "flex", gap: 10 }}>
+              <div style={{ display: "flex", gap: 10, alignItems: "center" }}>
+                {/* Botão de Editar */}
+                <button
+                  onClick={() => router.push(`/edit-ad/${ad.id}`)}
+                  style={{
+                    backgroundColor: "#0284C7",
+                    color: "#fff",
+                    border: "none",
+                    padding: "8px 12px",
+                    borderRadius: 6,
+                    cursor: "pointer",
+                    fontWeight: "bold",
+                  }}
+                >
+                  Editar
+                </button>
+
                 {ad.status !== "sold" && (
                   <button
                     onClick={() => handleMarkAsSold(ad.id)}
@@ -114,7 +129,7 @@ export default function MeusAnunciosPage() {
                       backgroundColor: "#16A34A",
                       color: "#fff",
                       border: "none",
-                      padding: "8, 12px",
+                      padding: "8px 12px",
                       borderRadius: 6,
                       cursor: "pointer",
                       fontWeight: "bold",
@@ -123,6 +138,7 @@ export default function MeusAnunciosPage() {
                     Marcar como Vendido
                   </button>
                 )}
+                
                 <button
                   onClick={() => handleDelete(ad.id)}
                   style={{

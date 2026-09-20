@@ -59,8 +59,6 @@ function ShopContent() {
   const [orderNotes, setOrderNotes] = useState("");
 
   const targetAdRef = useRef<HTMLDivElement | null>(null);
-  const scrollRefs = useRef<{ [key: string]: HTMLDivElement | null }>({});
-  const isInteractingRef = useRef<{ [key: string]: boolean }>({});
 
   useEffect(() => {
     async function loadShopData() {
@@ -116,36 +114,9 @@ function ShopContent() {
     loadShopData();
   }, [rawId, targetAdQuery]);
 
-  // Efeito para o carrossel se mover sozinho suavemente e voltar ao início ao chegar no fim
-  useEffect(() => {
-    const interval = setInterval(() => {
-      Object.keys(scrollRefs.current).forEach((key) => {
-        const container = scrollRefs.current[key];
-        if (container && !isInteractingRef.current[key]) {
-          const maxScrollLeft = container.scrollWidth - container.clientWidth;
-          if (container.scrollLeft >= maxScrollLeft - 5) {
-            container.scrollTo({ left: 0, behavior: "smooth" });
-          } else {
-            container.scrollBy({ left: 280, behavior: "smooth" });
-          }
-        }
-      });
-    }, 3500);
-
-    return () => clearInterval(interval);
-  }, [ads]);
-
   const activeThemeKey = profile?.theme_color && THEMES[profile.theme_color] ? profile.theme_color : "blue";
   const theme = THEMES[activeThemeKey];
   const isFoodMode = profile?.store_type === "food";
-
-  const scrollCategory = (categoryKey: string, direction: "left" | "right") => {
-    const container = scrollRefs.current[categoryKey];
-    if (container) {
-      const scrollAmount = direction === "left" ? -300 : 300;
-      container.scrollBy({ left: scrollAmount, behavior: "smooth" });
-    }
-  };
 
   const addToCart = (ad: Ad) => {
     setCart((prev) => {
@@ -221,25 +192,6 @@ function ShopContent() {
   return (
     <div style={{ minHeight: "100vh", backgroundColor: theme.bg, color: theme.text, paddingBottom: "100px" }}>
       <style jsx global>{`
-        .scroll-container {
-          display: flex;
-          gap: 20px;
-          overflow-x: auto;
-          scroll-snap-type: x mandatory;
-          -webkit-overflow-scrolling: touch;
-          padding-bottom: 10px;
-          scrollbar-width: none;
-        }
-
-        .scroll-container::-webkit-scrollbar {
-          display: none;
-        }
-
-        .scroll-item {
-          scroll-snap-align: start;
-          flex-shrink: 0;
-        }
-
         .title-clamp {
           display: -webkit-box;
           -webkit-line-clamp: 2;
@@ -266,7 +218,7 @@ function ShopContent() {
         </div>
       )}
 
-      <main style={{ maxWidth: "1200px", margin: "0 auto", padding: "0 20px", overflow: "hidden" }}>
+      <main style={{ maxWidth: "1200px", margin: "0 auto", padding: "0 20px" }}>
         {/* Header da Loja */}
         <div style={{ 
           display: "flex", 
@@ -307,83 +259,28 @@ function ShopContent() {
           </span>
         </div>
 
-        {/* Produtos e Categorias */}
+        {/* Produtos e Categorias em Grade Lateral Profissional */}
         {ads.length === 0 ? (
           <p style={{ color: "#64748B" }}>Esta loja ainda não publicou produtos no estoque.</p>
         ) : (
           Object.entries(groupedAds).map(([category, items]) => {
-            const categoryKey = category.replace(/\s+/g, "-").toLowerCase();
-
             return (
               <div key={category} style={{ marginBottom: "40px" }}>
-                <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: "18px" }}>
-                  <div style={{ display: "flex", alignItems: "center", gap: "10px", flex: 1 }}>
-                    <h2 style={{ fontSize: "20px", fontWeight: "bold", color: theme.primary, margin: 0 }}>
-                      {category}
-                    </h2>
-                    <span style={{ fontSize: "12px", backgroundColor: `${theme.primary}15`, color: theme.primary, padding: "2px 8px", borderRadius: "12px", fontWeight: "bold" }}>
-                      {items.length} {items.length === 1 ? "item" : "itens"}
-                    </span>
-                  </div>
-
-                  {/* Botões de navegação lateral para PC */}
-                  <div style={{ display: "flex", gap: "8px" }}>
-                    <button
-                      onClick={() => scrollCategory(categoryKey, "left")}
-                      style={{
-                        width: "32px",
-                        height: "32px",
-                        borderRadius: "50%",
-                        border: `1px solid ${theme.primary}44`,
-                        backgroundColor: "#fff",
-                        color: theme.primary,
-                        fontSize: "14px",
-                        fontWeight: "bold",
-                        cursor: "pointer",
-                        display: "flex",
-                        alignItems: "center",
-                        justifyContent: "center",
-                        boxShadow: "0 2px 5px rgba(0,0,0,0.05)"
-                      }}
-                      title="Anterior"
-                    >
-                      ❮
-                    </button>
-                    <button
-                      onClick={() => scrollCategory(categoryKey, "right")}
-                      style={{
-                        width: "32px",
-                        height: "32px",
-                        borderRadius: "50%",
-                        border: `1px solid ${theme.primary}44`,
-                        backgroundColor: "#fff",
-                        color: theme.primary,
-                        fontSize: "14px",
-                        fontWeight: "bold",
-                        cursor: "pointer",
-                        display: "flex",
-                        alignItems: "center",
-                        justifyContent: "center",
-                        boxShadow: "0 2px 5px rgba(0,0,0,0.05)"
-                      }}
-                      title="Próximo"
-                    >
-                      ❯
-                    </button>
-                  </div>
+                <div style={{ display: "flex", alignItems: "center", gap: "10px", marginBottom: "18px" }}>
+                  <h2 style={{ fontSize: "20px", fontWeight: "bold", color: theme.primary, margin: 0 }}>
+                    {category}
+                  </h2>
+                  <span style={{ fontSize: "12px", backgroundColor: `${theme.primary}15`, color: theme.primary, padding: "2px 8px", borderRadius: "12px", fontWeight: "bold" }}>
+                    {items.length} {items.length === 1 ? "item" : "itens"}
+                  </span>
                 </div>
 
-                {/* Carrossel com rolagem automática + toque livre */}
-                <div 
-                  className="scroll-container"
-                  ref={(el) => { scrollRefs.current[categoryKey] = el; }}
-                  onMouseEnter={() => { isInteractingRef.current[categoryKey] = true; }}
-                  onMouseLeave={() => { isInteractingRef.current[categoryKey] = false; }}
-                  onTouchStart={() => { isInteractingRef.current[categoryKey] = true; }}
-                  onTouchEnd={() => { 
-                    setTimeout(() => { isInteractingRef.current[categoryKey] = false; }, 3000); 
-                  }}
-                >
+                {/* Grade Responsiva Lateral para Computador e Celular */}
+                <div style={{
+                  display: "grid",
+                  gridTemplateColumns: "repeat(auto-fill, minmax(230px, 1fr))",
+                  gap: "20px"
+                }}>
                   {items.map((ad, idx) => {
                     const isHighlighted = ad.id === highlightedAdId;
 
@@ -396,19 +293,16 @@ function ShopContent() {
                     return (
                       <div
                         key={`${ad.id}-${idx}`}
-                        className="scroll-item"
                         ref={isHighlighted && idx === 0 ? targetAdRef : null}
                         style={{
-                          minWidth: "260px",
-                          maxWidth: "260px",
-                          border: isHighlighted ? `3px solid ${theme.primary}` : "1px solid #E2E8F0",
+                          border: isHighlighted ? `3px solid ${theme.primary}` : "1px solid #CBD5E1",
                           borderRadius: "12px",
                           overflow: "hidden",
                           backgroundColor: "#fff",
                           display: "flex",
                           flexDirection: "column",
                           justifyContent: "space-between",
-                          boxShadow: isHighlighted ? "0 8px 25px rgba(0,0,0,0.15)" : "0 2px 5px rgba(0,0,0,0.04)",
+                          boxShadow: isHighlighted ? "0 8px 25px rgba(0,0,0,0.15)" : "0 4px 12px rgba(0, 136, 255, 0.08)",
                           transform: isHighlighted ? "scale(1.02)" : "scale(1)",
                           transition: "all 0.3s ease",
                           position: "relative",
@@ -422,7 +316,9 @@ function ShopContent() {
 
                         <div>
                           {ad.image_url ? (
-                            <img src={ad.image_url} alt={ad.title} style={{ width: "100%", height: "180px", objectFit: "cover" }} />
+                            <div style={{ width: "100%", height: "180px", backgroundColor: "#F8FAFC", display: "flex", alignItems: "center", justifyContent: "center", padding: 10, borderBottom: "1px solid #F1F5F9" }}>
+                              <img src={ad.image_url} alt={ad.title} style={{ maxWidth: "100%", maxHeight: "100%", objectFit: "contain" }} />
+                            </div>
                           ) : (
                             <div style={{ width: "100%", height: "180px", backgroundColor: "#F1F5F9", display: "flex", alignItems: "center", justifyContent: "center", color: "#94A3B8" }}>📷 Sem Foto</div>
                           )}
