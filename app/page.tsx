@@ -28,6 +28,7 @@ interface Profile {
   bio?: string;
   whatsapp?: string;
   store_type?: string;
+  user_type?: string;
 }
 
 const CATEGORIES = [
@@ -126,14 +127,21 @@ export default function Home() {
 
   const relatedAds = ads.filter((ad) => !filteredAds.some((f) => f.id === ad.id));
 
+  // FILTRAGEM RIGOROSA PARA O COMÉRCIO LOCAL: Proíbe expressamente nomes que começam com "Anunciante" ou user_type "client"
   const filteredProfiles = profiles.filter(profile => {
+    const sName = profile.store_name || profile.name || "";
+    
+    // Proíbe se começar com "Anunciante" ou se for do tipo client
+    if (sName.toLowerCase().startsWith("anunciante") || profile.user_type === "client") {
+      return false;
+    }
+
     if (profile.city && profile.city.trim() !== "" && profile.city !== selectedCity) {
       return false;
     }
 
     if (!activeSearch) return true;
-    const storeName = profile.store_name || profile.name || "";
-    const nameMatch = storeName.toLowerCase().includes(activeSearch);
+    const nameMatch = sName.toLowerCase().includes(activeSearch);
     const bioMatch = profile.bio ? profile.bio.toLowerCase().includes(activeSearch) : false;
     return nameMatch || bioMatch;
   });
@@ -172,15 +180,15 @@ export default function Home() {
 
     return (
       <div key={profile.id} style={{ 
-        border: "1px solid #CBD5E1", 
-        borderRadius: 12, 
+        border: "1px solid #E2E8F0", 
+        borderRadius: 14, 
         overflow: "hidden", 
         backgroundColor: "#ffffff", 
         display: "flex", 
         flexDirection: "column", 
-        boxShadow: "0 4px 12px rgba(0, 136, 255, 0.1)"
+        boxShadow: "0 10px 25px -5px rgba(0, 0, 0, 0.05), 0 8px 10px -6px rgba(0, 0, 0, 0.05)",
+        transition: "transform 0.2s ease, box-shadow 0.2s ease"
       }}>
-        {/* FOTO DE CAPA */}
         <div style={{ width: "100%", height: 110, backgroundColor: "#0088FF", position: "relative" }}>
           {storeBanner ? (
             <img src={storeBanner} alt="Capa" style={{ width: "100%", height: "100%", objectFit: "cover" }} />
@@ -189,7 +197,6 @@ export default function Home() {
           )}
         </div>
 
-        {/* FOTO DE PERFIL / LOGO */}
         <div style={{ padding: "0 16px", position: "relative", marginTop: -35, display: "flex", alignItems: "flex-end", justifyContent: "space-between" }}>
           <div style={{ width: 70, height: 70, borderRadius: "50%", border: "3px solid #ffffff", backgroundColor: "#F1F5F9", overflow: "hidden", boxShadow: "0 2px 8px rgba(0,0,0,0.15)" }}>
             {storeLogo ? (
@@ -200,7 +207,6 @@ export default function Home() {
           </div>
         </div>
 
-        {/* INFORMAÇÕES DA LOJA */}
         <div style={{ padding: 16, flex: 1, display: "flex", flexDirection: "column", justifyContent: "space-between" }}>
           <div>
             <h4 style={{ fontSize: 17, margin: "6px 0 4px", color: "#0B2545", fontWeight: "bold" }}>
@@ -238,13 +244,17 @@ export default function Home() {
 
   const renderAdCard = (ad: Ad) => {
     const storeProfile = ad.user_id ? profilesMap[ad.user_id] : null;
-    const storeName = storeProfile ? (storeProfile.store_name || storeProfile.name) : null;
+    const storeNameRaw = storeProfile ? (storeProfile.store_name || storeProfile.name || "") : "";
     
+    // EXIBE A BARRA AZUL APENAS SE TIVER LOJA REAL E O NOME NÃO COMEÇAR COM "Anunciante"
+    const isRealStore = storeProfile && 
+      storeProfile.user_type !== "client" && 
+      !storeNameRaw.toLowerCase().startsWith("anunciante");
+
+    const storeName = isRealStore ? storeNameRaw : null;
     const isFoodStore = storeProfile?.store_type === "food";
 
     const formattedPrice = ad.price ? `R$ ${ad.price.toFixed(2)}` : "A combinar";
-    
-    // Inclui a URL da foto do produto na mensagem do WhatsApp se ela existir
     const imageText = ad.image_url ? `\n🖼️ Foto do produto: ${ad.image_url}` : "";
 
     const whatsappMessage = `🚀 Estou vindo do ConectaCidadeSp e tenho interesse neste produto:
@@ -255,14 +265,15 @@ export default function Home() {
 
     return (
       <div key={ad.id} style={{ 
-        border: "1px solid #CBD5E1", 
-        borderRadius: 12, 
+        border: "1px solid #E2E8F0", 
+        borderRadius: 14, 
         overflow: "hidden", 
         backgroundColor: "#ffffff", 
         display: "flex", 
         flexDirection: "column", 
-        boxShadow: "0 4px 12px rgba(0, 136, 255, 0.08)"
+        boxShadow: "0 10px 25px -5px rgba(0, 0, 0, 0.05), 0 8px 10px -6px rgba(0, 0, 0, 0.05)"
       }}>
+        {/* BARRA AZUL SUPERIOR EXCLUSIVA PARA LOJAS REAIS (NUNCA ANUNCIANTES COMUNS) */}
         {storeName && ad.user_id && (
           <a
             href={`/shop/${ad.user_id}`}

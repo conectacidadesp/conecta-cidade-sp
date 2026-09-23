@@ -12,20 +12,31 @@ interface Ad {
   city: string;
   description?: string;
   is_hidden?: boolean;
+  is_featured?: boolean;
 }
 
 const FONT_OPTIONS = [
-  { id: "sans", name: "Sans-serif (Moderno)", family: "sans-serif" },
-  { id: "serif", name: "Serif (Elegante)", family: "Georgia, serif" },
-  { id: "monospace", name: "Monospace (Técnico)", family: "monospace" },
+  { id: "sans", name: "Sans-serif (Moderno & Limpo)", family: "system-ui, -apple-system, sans-serif" },
+  { id: "serif", name: "Serif (Clássico & Elegante)", family: "Georgia, Cambria, 'Times New Roman', serif" },
+  { id: "mono", name: "Monospace (Técnico & Robusto)", family: "Menlo, Monaco, Consolas, monospace" },
+  { id: "rounded", name: "Rounded (Amigável & Jovem)", family: "'Comic Sans MS', 'Quicksand', 'Nunito', sans-serif" },
+  { id: "display", name: "Display (Impactante & Forte)", family: "'Impact', 'Arial Black', sans-serif" },
+  { id: "cursive", name: "Cursive (Sofisticado / Estilo Manual)", family: "'Brush Script MT', 'Lucida Handwriting', cursive" },
 ];
 
 const THEME_OPTIONS = [
   { id: "blue", name: "Azul Clássico", color: "#0F4C81" },
+  { id: "sky", name: "Azul Claro", color: "#0284C7" },
   { id: "emerald", name: "Verde Esmeralda", color: "#059669" },
+  { id: "lime", name: "Verde Limão", color: "#10B981" },
   { id: "purple", name: "Roxo Premium", color: "#7C3AED" },
-  { id: "darkGold", name: "Dark Gold", color: "#D97706" },
   { id: "rose", name: "Rosa Elegante", color: "#E11D48" },
+  { id: "orange", name: "Laranja Vibrante", color: "#F97316" },
+  { id: "red", name: "Vermelho Intenso", color: "#DC2626" },
+  { id: "darkGold", name: "Dark Gold / Âmbar", color: "#D97706" },
+  { id: "brown", name: "Marrom Café", color: "#78350F" },
+  { id: "slate", name: "Cinza Chumbo", color: "#475569" },
+  { id: "black", name: "Preto Clássico", color: "#0F172A" },
 ];
 
 export default function ProfileDashboard() {
@@ -41,6 +52,11 @@ export default function ProfileDashboard() {
   const [currentLogoUrl, setCurrentLogoUrl] = useState<string | null>(null);
   const [logoFile, setLogoFile] = useState<File | null>(null);
 
+  // Horários e Criação
+  const [openTime, setOpenTime] = useState("08:00");
+  const [closeTime, setCloseTime] = useState("18:00");
+  const [createdAtDate, setCreatedAtDate] = useState<string>("");
+
   // Personalização da Vitrine
   const [themeColor, setThemeColor] = useState("blue");
   const [fontStyle, setFontStyle] = useState("sans");
@@ -53,7 +69,6 @@ export default function ProfileDashboard() {
   const [loading, setLoading] = useState(false);
   const [fetching, setFetching] = useState(true);
   const [user, setUser] = useState<any>(null);
-  const [postingStoryId, setPostingStoryId] = useState<string | null>(null);
 
   const availableCities = ["Rubiácea-SP", "Guararapes-SP"];
 
@@ -75,8 +90,15 @@ export default function ProfileDashboard() {
         .eq("id", user.id)
         .single();
 
-      const isPhoneUser = user.email?.includes("phone") || user.phone || profileData?.user_type === "client";
-      const type = isPhoneUser ? "client" : (profileData?.user_type || "store");
+      // Identifica se é anunciante comum suportando AMBOS os padrões (@anunciante.com e phone_...@client.conectacidade.local)
+      const isClientUser = 
+        user.email?.includes("@anunciante.com") || 
+        user.email?.includes("phone_") || 
+        user.email?.endsWith("@client.conectacidade.local") || 
+        user.phone || 
+        profileData?.user_type === "client";
+      
+      const type = isClientUser ? "client" : (profileData?.user_type || "store");
       
       setUserType(type);
 
@@ -94,6 +116,16 @@ export default function ProfileDashboard() {
         setThemeColor(profileData.theme_color || "blue");
         setFontStyle(profileData.font_style || "sans");
         setBannerUrl(profileData.banner_url || null);
+        setOpenTime(profileData.open_time || "08:00");
+        setCloseTime(profileData.close_time || "18:00");
+        
+        if (profileData.created_at) {
+          const dateObj = new Date(profileData.created_at);
+          setCreatedAtDate(dateObj.toLocaleDateString("pt-BR"));
+        } else if (user.created_at) {
+          const dateObj = new Date(user.created_at);
+          setCreatedAtDate(dateObj.toLocaleDateString("pt-BR"));
+        }
       }
 
       setLoadingAds(true);
@@ -103,7 +135,19 @@ export default function ProfileDashboard() {
         .eq("user_id", user.id);
 
       if (adsData) {
-        setMyAds(adsData);
+        const { data: storiesData } = await supabase
+          .from("stories")
+          .select("ad_id")
+          .eq("profile_id", user.id);
+
+        const featuredAdIds = new Set(storiesData?.map(s => s.ad_id) || []);
+
+        const formattedAds: Ad[] = adsData.map(ad => ({
+          ...ad,
+          is_featured: featuredAdIds.has(ad.id)
+        }));
+
+        setMyAds(formattedAds);
       }
       
       setLoadingAds(false);
@@ -156,6 +200,12 @@ export default function ProfileDashboard() {
       }
     }
 
+    const isClientUser = 
+      user.email?.includes("@anunciante.com") || 
+      user.email?.includes("phone_") || 
+      user.email?.endsWith("@client.conectacidade.local") || 
+      user.phone;
+
     const profileData: any = {
       id: user.id,
       store_name: storeName,
@@ -166,7 +216,10 @@ export default function ProfileDashboard() {
       logo_url: uploadedLogoUrl,
       theme_color: themeColor,
       font_style: fontStyle,
-      banner_url: uploadedBannerUrl
+      banner_url: uploadedBannerUrl,
+      open_time: openTime,
+      close_time: closeTime,
+      user_type: isClientUser ? "client" : "store"
     };
 
     const { error } = await supabase.from("profiles").upsert(profileData);
@@ -182,56 +235,6 @@ export default function ProfileDashboard() {
     }
   };
 
-  const handleCreateStory = async (ad: Ad) => {
-    if (!user) return;
-    setPostingStoryId(ad.id);
-
-    const { error } = await supabase.from("stories").insert([
-      {
-        profile_id: user.id,
-        ad_id: ad.id,
-        image_url: ad.image_url || currentLogoUrl || "",
-        title: ad.title
-      }
-    ]);
-
-    setPostingStoryId(null);
-
-    if (error) {
-      alert("Erro ao publicar destaque: " + error.message);
-    } else {
-      alert(`✨ Destaque publicado! "${ad.title}" ficará no topo por 24 horas.`);
-    }
-  };
-
-  // Alterna entre oculto e visível para Lojas
-  const handleToggleHideAd = async (adId: string, currentStatus: boolean | undefined) => {
-    const nextStatus = !currentStatus;
-    const { error } = await supabase
-      .from("ads")
-      .update({ is_hidden: nextStatus })
-      .eq("id", adId);
-
-    if (!error) {
-      setMyAds(myAds.map(ad => ad.id === adId ? { ...ad, is_hidden: nextStatus } : ad));
-    } else {
-      alert("Erro ao atualizar o status do produto: " + error.message);
-    }
-  };
-
-  const handleMarkAsSold = async (adId: string, adTitle: string) => {
-    if (!window.confirm(`Marcar o anúncio "${adTitle}" como Vendido?`)) return;
-
-    const { error } = await supabase.from("ads").delete().eq("id", adId);
-
-    if (!error) {
-      setMyAds(myAds.filter(ad => ad.id !== adId));
-      alert("Anúncio marcado como vendido e removido com sucesso!");
-    } else {
-      alert("Erro ao atualizar anúncio: " + error.message);
-    }
-  };
-
   const handleDeleteAd = async (adId: string, adTitle: string) => {
     if (!window.confirm(`Excluir permanentemente o anúncio "${adTitle}"?`)) return;
 
@@ -240,11 +243,13 @@ export default function ProfileDashboard() {
     if (!error) {
       setMyAds(myAds.filter(ad => ad.id !== adId));
       alert("Anúncio removido!");
+    } else {
+      alert("Erro ao remover anúncio: " + error.message);
     }
   };
 
   const activeThemeHex = THEME_OPTIONS.find(t => t.id === themeColor)?.color || "#0F4C81";
-  const activeFontFamily = FONT_OPTIONS.find(f => f.id === fontStyle)?.family || "sans-serif";
+  const activeFontFamily = FONT_OPTIONS.find(f => f.id === fontStyle)?.family || "system-ui, -apple-system, sans-serif";
 
   if (fetching) {
     return <p style={{ textAlign: "center", padding: "60px", color: "#64748B", fontFamily: "sans-serif" }}>Carregando Painel...</p>;
@@ -314,11 +319,7 @@ export default function ProfileDashboard() {
               📦 Meus Anúncios ({myAds.length})
             </button>
           </div>
-        ) : (
-          <div style={{ padding: "16px 25px", borderBottom: "1px solid #E2E8F0", backgroundColor: "#F1F5F9" }}>
-            <h2 style={{ margin: 0, fontSize: 18, color: "#1E293B" }}>Painel do Anunciante</h2>
-          </div>
-        )}
+        ) : null}
 
         <div style={{ padding: 25 }}>
 
@@ -362,6 +363,27 @@ export default function ProfileDashboard() {
                 </select>
               </div>
 
+              <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 12 }}>
+                <div>
+                  <label style={{ display: "block", fontSize: 13, fontWeight: "bold", marginBottom: 6 }}>Abre às:</label>
+                  <input 
+                    type="time" 
+                    value={openTime} 
+                    onChange={(e) => setOpenTime(e.target.value)} 
+                    style={{ width: "100%", padding: 12, border: "1px solid #CBD5E1", borderRadius: 6, fontSize: 14 }} 
+                  />
+                </div>
+                <div>
+                  <label style={{ display: "block", fontSize: 13, fontWeight: "bold", marginBottom: 6 }}>Fecha às:</label>
+                  <input 
+                    type="time" 
+                    value={closeTime} 
+                    onChange={(e) => setCloseTime(e.target.value)} 
+                    style={{ width: "100%", padding: 12, border: "1px solid #CBD5E1", borderRadius: 6, fontSize: 14 }} 
+                  />
+                </div>
+              </div>
+
               <div>
                 <label style={{ display: "block", fontSize: 13, fontWeight: "bold", marginBottom: 6 }}>WhatsApp para Contato:</label>
                 <input 
@@ -391,6 +413,12 @@ export default function ProfileDashboard() {
                 <input type="file" accept="image/*" onChange={(e) => e.target.files && setLogoFile(e.target.files[0])} />
               </div>
 
+              {createdAtDate && (
+                <div style={{ padding: "10px 14px", backgroundColor: "#F1F5F9", borderRadius: 6, fontSize: 13, color: "#475569" }}>
+                  🛡️ Loja na Conecta Cidade SP desde: <b>{createdAtDate}</b>
+                </div>
+              )}
+
               <button type="submit" disabled={loading} style={{ padding: 14, backgroundColor: activeThemeHex, color: "#fff", border: "none", borderRadius: 6, fontSize: 15, fontWeight: "bold", cursor: "pointer", marginTop: 10 }}>
                 {loading ? "Salvando..." : "Salvar Configurações"}
               </button>
@@ -404,16 +432,16 @@ export default function ProfileDashboard() {
 
                 <div>
                   <label style={{ display: "block", fontSize: 13, fontWeight: "bold", marginBottom: 8 }}>Cor do Tema da Vitrine:</label>
-                  <div style={{ display: "flex", gap: 10, flexWrap: "wrap" }}>
+                  <div style={{ display: "grid", gridTemplateColumns: "repeat(6, 36px)", gap: 10, maxWidth: "100%" }}>
                     {THEME_OPTIONS.map((theme) => (
                       <button
                         key={theme.id}
                         type="button"
                         onClick={() => setThemeColor(theme.id)}
                         style={{
-                          width: 38, height: 38, borderRadius: "50%",
+                          width: 36, height: 36, borderRadius: "50%",
                           backgroundColor: theme.color,
-                          border: themeColor === theme.id ? "3px solid #1E293B" : "none",
+                          border: themeColor === theme.id ? "3px solid #1E293B" : "2px solid #E2E8F0",
                           cursor: "pointer"
                         }}
                         title={theme.name}
@@ -427,10 +455,12 @@ export default function ProfileDashboard() {
                   <select
                     value={fontStyle}
                     onChange={(e) => setFontStyle(e.target.value)}
-                    style={{ width: "100%", padding: 12, border: "1px solid #CBD5E1", borderRadius: 6, fontSize: 14, backgroundColor: "#fff" }}
+                    style={{ width: "100%", padding: 12, border: "1px solid #CBD5E1", borderRadius: 6, fontSize: 14, backgroundColor: "#fff", fontFamily: activeFontFamily }}
                   >
                     {FONT_OPTIONS.map((font) => (
-                      <option key={font.id} value={font.id}>{font.name}</option>
+                      <option key={font.id} value={font.id} style={{ fontFamily: font.family }}>
+                        {font.name}
+                      </option>
                     ))}
                   </select>
                 </div>
@@ -456,7 +486,7 @@ export default function ProfileDashboard() {
                   {currentLogoUrl ? (
                     <img src={currentLogoUrl} alt="Logo" style={{ width: 60, height: 60, borderRadius: "50%", position: "absolute", bottom: -20, left: 15, border: "3px solid #fff", objectFit: "cover" }} />
                   ) : (
-                    <div style={{ width: 60, height: 60, borderRadius: "50%", backgroundColor: "#fff", color: activeThemeHex, position: "absolute", bottom: -20, left: 15, display: "flex", alignItems: "center", justifyContent: "center", fontWeight: "bold", fontSize: 20 }}>
+                    <div style={{ width: 60, height: 60, borderRadius: "50%", backgroundColor: "#fff", color: activeThemeHex, position: "absolute", bottom: -20, left: 15, display: "flex", alignItems: "center", justifyContent: "center", fontWeight: "bold", fontSize: 20, fontFamily: activeFontFamily }}>
                       {storeName.charAt(0) || "L"}
                     </div>
                   )}
@@ -464,6 +494,9 @@ export default function ProfileDashboard() {
                 <div style={{ padding: "30px 15px 15px 15px", fontFamily: activeFontFamily }}>
                   <h3 style={{ margin: 0, color: activeThemeHex, fontSize: 18 }}>{storeName || "Nome da Loja"}</h3>
                   <p style={{ margin: "4px 0 10px 0", fontSize: 12, color: "#64748B" }}>{bio || "Descrição..."}</p>
+                  {createdAtDate && (
+                    <p style={{ fontSize: 11, color: "#64748B", marginTop: 15 }}>Loja na Conecta Cidade SP desde {createdAtDate}</p>
+                  )}
                 </div>
               </div>
             </div>
@@ -473,7 +506,7 @@ export default function ProfileDashboard() {
             <div>
               <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 20 }}>
                 <div>
-                  <h2 style={{ fontSize: 20, margin: 0, fontWeight: "bold", color: "#1E293B" }}>Estoque / Anúncios</h2>
+                  <h2 style={{ fontSize: 20, margin: 0, fontWeight: "bold", color: "#1E293B" }}>Meus Anúncios</h2>
                   <p style={{ color: "#64748B", margin: "4px 0 0 0", fontSize: 13 }}>Gerencie as publicações exibidas no site.</p>
                 </div>
                 <button onClick={() => window.location.href = "/create"} style={{ padding: "10px 14px", backgroundColor: activeThemeHex, color: "#fff", border: "none", borderRadius: 6, fontWeight: "bold", cursor: "pointer", fontSize: 13 }}>
@@ -502,7 +535,7 @@ export default function ProfileDashboard() {
                         )}
                         <div style={{ minWidth: 0 }}>
                           <h4 style={{ margin: 0, fontSize: 14, fontWeight: "bold", color: "#1E293B", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
-                            {ad.title} {ad.is_hidden && <span style={{ color: "#DC2626", fontSize: 11 }}>(Oculto / Esgotado)</span>}
+                            {ad.title}
                           </h4>
                           <p style={{ margin: "3px 0 0 0", fontSize: 13, color: activeThemeHex, fontWeight: "bold" }}>
                             {ad.price ? `R$ ${ad.price.toFixed(2)}` : "Valor a combinar"}
@@ -512,43 +545,16 @@ export default function ProfileDashboard() {
                       </div>
 
                       <div style={{ display: "flex", gap: 6, flexShrink: 0, marginTop: 8 }}>
-                        {userType === "store" && (
-                          <button 
-                            onClick={() => handleCreateStory(ad)}
-                            disabled={postingStoryId === ad.id || ad.is_hidden}
-                            style={{ padding: "8px 10px", backgroundColor: ad.is_hidden ? "#CBD5E1" : activeThemeHex, color: "#fff", border: "none", borderRadius: 6, fontSize: 11, fontWeight: "bold", cursor: ad.is_hidden ? "not-allowed" : "pointer" }}
-                          >
-                            {postingStoryId === ad.id ? "Postando..." : "⚡ Destacar 24h"}
-                          </button>
-                        )}
-
-                        {/* Botão Dinâmico: Se for loja, vira Ocultar/Adicionar. Se for individual, vira Vendido */}
-                        {userType === "store" ? (
-                          <button 
-                            onClick={() => handleToggleHideAd(ad.id, ad.is_hidden)}
-                            style={{ padding: "8px 10px", backgroundColor: ad.is_hidden ? "#D1FAE5" : "#FEF3C7", color: ad.is_hidden ? "#065F46" : "#92400E", border: "none", borderRadius: 6, fontSize: 11, fontWeight: "bold", cursor: "pointer" }}
-                          >
-                            {ad.is_hidden ? "Adicionar" : "Ocultar"}
-                          </button>
-                        ) : (
-                          <button 
-                            onClick={() => handleMarkAsSold(ad.id, ad.title)}
-                            style={{ padding: "8px 10px", backgroundColor: "#D1FAE5", color: "#065F46", border: "none", borderRadius: 6, fontSize: 11, fontWeight: "bold", cursor: "pointer" }}
-                          >
-                            Vendido
-                          </button>
-                        )}
-
                         <button 
                           onClick={() => window.location.href = `/edit-ad/${ad.id}`}
-                          style={{ padding: "8px 10px", backgroundColor: "#E2E8F0", color: "#1E293B", border: "none", borderRadius: 6, fontSize: 11, fontWeight: "bold", cursor: "pointer" }}
+                          style={{ padding: "8px 12px", backgroundColor: "#E2E8F0", color: "#1E293B", border: "none", borderRadius: 6, fontSize: 12, fontWeight: "bold", cursor: "pointer" }}
                         >
                           Editar
                         </button>
 
                         <button 
                           onClick={() => handleDeleteAd(ad.id, ad.title)}
-                          style={{ padding: "8px 10px", backgroundColor: "#FEE2E2", color: "#DC2626", border: "none", borderRadius: 6, fontSize: 11, fontWeight: "bold", cursor: "pointer" }}
+                          style={{ padding: "8px 12px", backgroundColor: "#FEE2E2", color: "#DC2626", border: "none", borderRadius: 6, fontSize: 12, fontWeight: "bold", cursor: "pointer" }}
                         >
                           Excluir
                         </button>

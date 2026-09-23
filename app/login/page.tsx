@@ -133,7 +133,7 @@ export default function Login() {
               <input 
                 style={{ width: "100%", padding: "11px 14px", border: "1px solid #cbd5e1", borderRadius: "8px", color: "#000", fontSize: "14px", outline: "none" }} 
                 type="password" 
-                placeholder="Sua senha de acesso" 
+                placeholder="Sua senha" 
                 required 
                 onChange={(e) => setAdvertiserForm({ ...advertiserForm, password: e.target.value })} 
               />

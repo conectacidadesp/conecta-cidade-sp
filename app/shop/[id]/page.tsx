@@ -23,6 +23,9 @@ interface StoreProfile {
   banner_url?: string | null;
   theme_color?: string | null;
   store_type?: "marketplace" | "food";
+  open_time?: string;
+  close_time?: string;
+  created_at?: string;
 }
 
 interface CartItem {
@@ -37,6 +40,28 @@ const THEMES: Record<string, { primary: string; bg: string; text: string; accent
   darkGold: { primary: "#D97706", bg: "#18181B", text: "#F3F4F6", accent: "#F59E0B" },
   rose: { primary: "#E11D48", bg: "#FFF1F2", text: "#881337", accent: "#F43F5E" },
 };
+
+// 🕒 Função corrigida com fuso horário do Brasil (America/Sao_Paulo)
+function checkIsOpen(openTime?: string, closeTime?: string) {
+  if (!openTime || !closeTime) return true; // Padrão aberto se o lojista não preencheu
+
+  const now = new Date();
+  const formatter = new Intl.DateTimeFormat('en-US', {
+    timeZone: 'America/Sao_Paulo',
+    hour: 'numeric',
+    minute: 'numeric',
+    hour12: false,
+  });
+
+  const parts = formatter.formatToParts(now);
+  const hours = parts.find((p) => p.type === "hour")?.value || "00";
+  const minutes = parts.find((p) => p.type === "minute")?.value || "00";
+  
+  const normalizedHours = hours === "24" ? "00" : hours.padStart(2, "0");
+  const currentTime = `${normalizedHours}:${minutes.padStart(2, "0")}`;
+
+  return currentTime >= openTime && currentTime <= closeTime;
+}
 
 function ShopContent() {
   const params = useParams();
@@ -117,6 +142,7 @@ function ShopContent() {
   const activeThemeKey = profile?.theme_color && THEMES[profile.theme_color] ? profile.theme_color : "blue";
   const theme = THEMES[activeThemeKey];
   const isFoodMode = profile?.store_type === "food";
+  const isOpen = checkIsOpen(profile?.open_time, profile?.close_time);
 
   const addToCart = (ad: Ad) => {
     setCart((prev) => {
@@ -248,9 +274,34 @@ function ShopContent() {
               <h1 style={{ fontSize: "24px", margin: 0, color: theme.primary, fontWeight: "bold", whiteSpace: "normal", wordBreak: "break-word" }}>
                 {profile?.store_name || "Vitrine da Loja"}
               </h1>
-              <p style={{ color: theme.text, opacity: 0.8, margin: "5px 0 0 0", fontSize: "13px", lineHeight: "1.3" }}>
+              <p style={{ color: theme.text, opacity: 0.8, margin: "4px 0", fontSize: "13px", lineHeight: "1.3" }}>
                 {isFoodMode ? "🍔 Faça seu pedido online no nosso cardápio virtual!" : "Confira todo o nosso estoque virtual ativo abaixo"}
               </p>
+
+              {/* 🟢🔴 Indicador Visual de Aberto / Fechado em tempo real */}
+              <div style={{ display: "flex", alignItems: "center", gap: 6, fontSize: 12, fontWeight: "bold", margin: "6px 0", padding: "3px 8px", backgroundColor: isOpen ? "#ECFDF5" : "#FEF2F2", borderRadius: 6, width: "fit-content" }}>
+                <span style={{ 
+                  width: 8, 
+                  height: 8, 
+                  borderRadius: "50%", 
+                  backgroundColor: isOpen ? "#10B981" : "#EF4444",
+                  display: "inline-block"
+                }} />
+                <span style={{ color: isOpen ? "#065F46" : "#991B1B" }}>
+                  {isOpen ? "Aberto Agora" : "Fechado Agora"}
+                </span>
+                <span style={{ color: "#64748B", fontWeight: "normal", fontSize: 11 }}>
+                  ({profile?.open_time || "08:00"} às {profile?.close_time || "18:00"})
+                </span>
+              </div>
+
+              {/* 🛡️ Selo de Confiabilidade com a Data Real de Registro */}
+              {profile?.created_at && (
+                <p style={{ fontSize: 11, color: "#64748B", margin: "4px 0 0 0", display: "flex", alignItems: "center", gap: 4 }}>
+                  <span>🛡️</span>
+                  <span>Loja na Conecta Cidade SP desde <b>{new Date(profile.created_at).toLocaleDateString("pt-BR")}</b></span>
+                </p>
+              )}
             </div>
           </div>
 
