@@ -131,7 +131,6 @@ export default function Home() {
   const filteredProfiles = profiles.filter(profile => {
     const sName = profile.store_name || profile.name || "";
     
-    // Proíbe se começar com "Anunciante" ou se for do tipo client
     if (sName.toLowerCase().startsWith("anunciante") || profile.user_type === "client") {
       return false;
     }
@@ -498,11 +497,21 @@ export default function Home() {
       {reportingAd && (
         <div style={{ 
           position: "fixed", top: 0, left: 0, width: "100vw", height: "100vh", 
-          backgroundColor: "rgba(0,0,0,0.6)", display: "flex", alignItems: "center", justifyContent: "center", zIndex: 9999, padding: "16px" 
+          backgroundColor: "rgba(0,0,0,0.6)", display: "flex", alignItems: "center", justifyContent: "center", zIndex: 9999, padding: "16px",
+          boxSizing: "border-box"
         }}>
-          <div style={{ backgroundColor: "#fff", borderRadius: 12, padding: "20px", maxWidth: 450, width: "100%", boxShadow: "0 10px 25px rgba(0,0,0,0.2)" }}>
+          <div style={{ 
+            backgroundColor: "#fff", 
+            borderRadius: 12, 
+            padding: "20px", 
+            width: "100%", 
+            maxWidth: 450, 
+            boxShadow: "0 10px 25px rgba(0,0,0,0.2)",
+            boxSizing: "border-box",
+            margin: "0 16px"
+          }}>
             <h3 style={{ margin: "0 0 10px", color: "#1E293B", fontSize: 18 }}>Denunciar Anúncio</h3>
-            <p style={{ fontSize: 13, color: "#64748B", margin: "0 0 15px" }}>Anúncio: <strong>{reportingAd.title}</strong></p>
+            <p style={{ fontSize: 13, color: "#64748B", margin: "0 0 15px", wordBreak: "break-word" }}>Anúncio: <strong>{reportingAd.title}</strong></p>
 
             <form onSubmit={handleSendReport}>
               <div style={{ marginBottom: 15 }}>
@@ -510,7 +519,7 @@ export default function Home() {
                 <select
                   value={reportReason}
                   onChange={(e) => setReportReason(e.target.value)}
-                  style={{ width: "100%", padding: "10px", borderRadius: 6, border: "1px solid #CBD5E1", fontSize: 14 }}
+                  style={{ width: "100%", padding: "10px", borderRadius: 6, border: "1px solid #CBD5E1", fontSize: 14, boxSizing: "border-box" }}
                 >
                   <option value="Conteúdo impróprio / Proibido">Conteúdo impróprio / Proibido</option>
                   <option value="Suspeita de Golpe / Fraude">Suspeita de Golpe / Fraude</option>
@@ -527,11 +536,11 @@ export default function Home() {
                   value={reportDetails}
                   onChange={(e) => setReportDetails(e.target.value)}
                   rows={3}
-                  style={{ width: "100%", padding: "10px", borderRadius: 6, border: "1px solid #CBD5E1", fontSize: 14 }}
+                  style={{ width: "100%", padding: "10px", borderRadius: 6, border: "1px solid #CBD5E1", fontSize: 14, boxSizing: "border-box", resize: "vertical" }}
                 />
               </div>
 
-              <div style={{ display: "flex", justifyContent: "flex-end", gap: 10 }}>
+              <div style={{ display: "flex", justifyContent: "flex-end", gap: 10, flexWrap: "wrap" }}>
                 <button
                   type="button"
                   onClick={() => setReportingAd(null)}
