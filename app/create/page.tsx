@@ -52,44 +52,47 @@ const categoriesData: Record<string, { icon: string; subs: string[] }> = {
   }
 };
 
-// ⚡ Função pura em Canvas para Redimensionar e Comprimir Fotos no Navegador
-const compressAndResizeImage = (file: File, maxWidth = 800, maxHeight = 800, quality = 0.8): Promise<Blob> => {
+// ⚡ Otimizador Inteligente: Converte e redimensiona para Quadrado Perfeito (800x800px) com controle de peso
+const compressAndResizeImage = (file: File, targetSize = 800, quality = 0.8): Promise<Blob> => {
   return new Promise((resolve, reject) => {
     const img = new Image();
     img.src = URL.createObjectURL(file);
     img.onload = () => {
-      let width = img.width;
-      let height = img.height;
-
-      if (width > height) {
-        if (width > maxWidth) {
-          height = Math.round((height * maxWidth) / width);
-          width = maxWidth;
-        }
-      } else {
-        if (height > maxHeight) {
-          width = Math.round((width * maxHeight) / height);
-          height = maxHeight;
-        }
-      }
-
       const canvas = document.createElement("canvas");
-      canvas.width = width;
-      canvas.height = height;
+      canvas.width = targetSize;
+      canvas.height = targetSize;
       const ctx = canvas.getContext("2d");
 
       if (!ctx) {
         return reject(new Error("Erro ao processar imagem no navegador."));
       }
 
-      ctx.drawImage(img, 0, 0, width, height);
+      ctx.fillStyle = "#FFFFFF";
+      ctx.fillRect(0, 0, targetSize, targetSize);
+
+      let width = img.width;
+      let height = img.height;
+      let renderWidth = targetSize;
+      let renderHeight = targetSize;
+      let offsetX = 0;
+      let offsetY = 0;
+
+      if (width > height) {
+        renderHeight = (height * targetSize) / width;
+        offsetY = (targetSize - renderHeight) / 2;
+      } else {
+        renderWidth = (width * targetSize) / height;
+        offsetX = (targetSize - renderWidth) / 2;
+      }
+
+      ctx.drawImage(img, offsetX, offsetY, renderWidth, renderHeight);
 
       canvas.toBlob(
         (blob) => {
           if (blob) {
             resolve(blob);
           } else {
-            reject(new Error("Falha na compressão da imagem."));
+            reject(new Error("Falha na compactação da imagem."));
           }
         },
         "image/jpeg",
@@ -103,10 +106,12 @@ const compressAndResizeImage = (file: File, maxWidth = 800, maxHeight = 800, qua
 export default function CreateAd() {
   const [title, setTitle] = useState("");
   const [description, setDescription] = useState("");
-  const [price, setPrice] = useState("");
+  const [priceDisplay, setPriceDisplay] = useState(""); // Exibição formatada (ex: R$ 1.234,56)
+  const [rawPriceValue, setRawPriceValue] = useState<number | null>(null); // Valor numérico para o banco
   const [category, setCategory] = useState("");
   const [subcategory, setSubcategory] = useState("");
   const [whatsapp, setWhatsapp] = useState("");
+  const [customAdvertiserName, setCustomAdvertiserName] = useState(""); 
   const [imageFile, setImageFile] = useState<File | null>(null);
   const [loading, setLoading] = useState(false);
   const [checkingAuth, setCheckingAuth] = useState(true);
@@ -160,6 +165,27 @@ export default function CreateAd() {
     checkUserSession();
   }, [router]);
 
+  // 💱 Função de Máscara Monetária Automática
+  const handlePriceChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const valueOnly = e.target.value.replace(/\D/g, "");
+    
+    if (!valueOnly) {
+      setPriceDisplay("");
+      setRawPriceValue(null);
+      return;
+    }
+
+    const numericValue = parseInt(valueOnly, 10) / 100;
+    setRawPriceValue(numericValue);
+
+    const formatted = numericValue.toLocaleString("pt-BR", {
+      style: "currency",
+      currency: "BRL",
+    });
+
+    setPriceDisplay(formatted);
+  };
+
   const handleCategoryChange = (e: React.ChangeEvent<HTMLSelectElement>) => {
     setCategory(e.target.value);
     setSubcategory(""); 
@@ -174,7 +200,7 @@ export default function CreateAd() {
     const finalWhatsapp = whatsapp.trim() || profileWhatsapp;
 
     if (!finalWhatsapp) {
-      alert("⚠️ Por favor, informe um número de WhatsApp com DDD para o anúncio.");
+      alert("⚠️ Por favor, informe um número ou contato de WhatsApp.");
       setLoading(false);
       return;
     }
@@ -183,14 +209,15 @@ export default function CreateAd() {
 
     if (imageFile) {
       try {
-        const compressedBlob = await compressAndResizeImage(imageFile, 800, 800, 0.8);
-        const fileName = `${Math.random()}.jpg`;
+        const compressedBlob = await compressAndResizeImage(imageFile, 800, 0.8);
+        const fileName = `${loggedUserId}-${Date.now()}.jpg`;
         const filePath = `public/${fileName}`;
 
         const { error: uploadError } = await supabase.storage
           .from("ads-images")
           .upload(filePath, compressedBlob, {
-            contentType: "image/jpeg"
+            contentType: "image/jpeg",
+            upsert: true
           });
 
         if (uploadError) {
@@ -215,14 +242,15 @@ export default function CreateAd() {
       {
         title,
         description,
-        price: price ? parseFloat(price) : null,
+        price: rawPriceValue,
         category,
         subcategory: subcategory || null,
         custom_category: customCategoryValue,
         whatsapp: finalWhatsapp,
         city: city,
         image_url: uploadedImageUrl || null,
-        user_id: loggedUserId
+        user_id: loggedUserId,
+        advertiser_name: customAdvertiserName.trim() || null
       },
     ]);
 
@@ -247,9 +275,29 @@ export default function CreateAd() {
         <p style={{ color: "#64748B", marginBottom: 25, fontSize: 14, textAlign: "center" }}>Preencha os campos abaixo para publicar seu produto ou serviço.</p>
 
         <form onSubmit={handleCreate} style={{ display: "flex", flexDirection: "column", gap: 16 }}>
+          
+          <div style={{ display: "flex", flexDirection: "column", gap: 5 }}>
+            <label style={{ fontSize: 14, fontWeight: "bold", color: "#1E293B" }}>👤 Nome de Quem está Anunciando:</label>
+            <input 
+              placeholder="Ex: João da Silva / Dona Maria / Oficina do Zé" 
+              value={customAdvertiserName} 
+              onChange={(e) => setCustomAdvertiserName(e.target.value)} 
+              style={{ padding: 12, border: "1px solid #CBD5E1", borderRadius: 6, fontSize: 15 }} 
+            />
+            <span style={{ fontSize: 12, color: "#64748B" }}>Aparecerá em destaque no topo do anúncio para contato direto.</span>
+          </div>
+
           <input placeholder="Título do Anúncio" value={title} onChange={(e) => setTitle(e.target.value)} required style={{ padding: 12, border: "1px solid #CBD5E1", borderRadius: 6, fontSize: 15 }} />
           <textarea placeholder="Descrição Detalhada" value={description} onChange={(e) => setDescription(e.target.value)} required rows={3} style={{ padding: 12, border: "1px solid #CBD5E1", borderRadius: 6, fontSize: 15, resize: "none" }} />
-          <input placeholder="Preço em R$ (Opcional)" type="number" step="0.01" value={price} onChange={(e) => setPrice(e.target.value)} style={{ padding: 12, border: "1px solid #CBD5E1", borderRadius: 6, fontSize: 15 }} />
+          
+          {/* Campo de Preço com Máscara Monetária Automática */}
+          <input 
+            placeholder="Preço (Ex: 50,00) - Opcional" 
+            type="text" 
+            value={priceDisplay} 
+            onChange={handlePriceChange} 
+            style={{ padding: 12, border: "1px solid #CBD5E1", borderRadius: 6, fontSize: 15 }} 
+          />
           
           <div style={{ display: "flex", flexDirection: "column", gap: 5 }}>
             <label style={{ fontSize: 14, fontWeight: "bold", color: "#1E293B" }}>📁 Selecione a Categoria:</label>
@@ -288,7 +336,7 @@ export default function CreateAd() {
           )}
 
           <input 
-            placeholder={profileWhatsapp ? `WhatsApp (Opcional - Padrão: ${profileWhatsapp})` : "WhatsApp com DDD (Apenas números)"} 
+            placeholder={profileWhatsapp ? `WhatsApp (Ex: 18999998888 ou texto livre)` : "WhatsApp de Contato (Número ou texto livre)"} 
             value={whatsapp} 
             onChange={(e) => setWhatsapp(e.target.value)} 
             required={!profileWhatsapp}
@@ -298,6 +346,7 @@ export default function CreateAd() {
           <div style={{ display: "flex", flexDirection: "column", gap: 5 }}>
             <label style={{ fontSize: 14, fontWeight: "bold", color: "#1E293B" }}>📸 Foto do Produto (Opcional):</label>
             <input type="file" accept="image/*" onChange={(e) => e.target.files && setImageFile(e.target.files[0])} style={{ fontSize: 14, cursor: "pointer" }} />
+            <span style={{ fontSize: 12, color: "#64748B" }}>A imagem será otimizada e redimensionada automaticamente.</span>
           </div>
 
           <button type="submit" disabled={loading} style={{ padding: 14, backgroundColor: "#0F4C81", color: "white", border: "none", borderRadius: 6, fontSize: 16, fontWeight: "bold", cursor: "pointer", marginTop: 10 }}>

@@ -335,11 +335,17 @@ function ShopContent() {
                   {items.map((ad, idx) => {
                     const isHighlighted = ad.id === highlightedAdId;
 
-                    const marketMessage = `🚀 *Olá! Estou vindo do ConectaCidadeSp e tenho interesse neste produto:*\n\n` +
-                      `📦 *${ad.title}*\n` +
-                      `💰 *Preço:* ${ad.price ? `R$ ${ad.price.toFixed(2)}` : "A combinar"}\n` +
-                      `📝 *Detalhes:* ${ad.description || "Sem descrição"}\n` +
-                      (ad.image_url ? `\n🖼️ *Foto do produto:* ${ad.image_url}` : "");
+                    const formattedPrice = ad.price ? `R$ ${ad.price.toFixed(2)}` : "A combinar";
+                    const imageText = ad.image_url ? ad.image_url : "Nenhuma foto informada";
+                    const adLink = typeof window !== "undefined" ? `${window.location.origin}` : "";
+
+                    const marketMessage = `🚀 Estou vindo do *Conecta Cidade Sp* e tenho interesse neste produto:
+
+📦 ${ad.title}
+💰 ${formattedPrice}
+📝 Detalhes: ${ad.description || "Sem descrição"}
+🖼️ Foto do produto: ${imageText}
+🔗 Ver anúncio: ${adLink}`;
 
                     return (
                       <div
@@ -385,7 +391,7 @@ function ShopContent() {
 
                         <div style={{ padding: "14px", paddingTop: 0 }}>
                           <p style={{ fontSize: "18px", fontWeight: "bold", color: theme.primary, margin: "10px 0" }}>
-                            {ad.price ? `R$ ${ad.price.toFixed(2)}` : "Combinar valor"}
+                            {formattedPrice}
                           </p>
 
                           {isFoodMode ? (

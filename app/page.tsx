@@ -16,6 +16,7 @@ interface Ad {
   city: string;
   image_url: string | null;
   created_at: string;
+  advertiser_name?: string | null;
 }
 
 interface Profile {
@@ -119,7 +120,8 @@ export default function Home() {
       const descMatch = ad.description.toLowerCase().includes(activeSearch);
       const catMatch = ad.category.toLowerCase().includes(activeSearch);
       const subcatMatch = ad.subcategory ? ad.subcategory.toLowerCase().includes(activeSearch) : false;
-      matchesSearch = titleMatch || descMatch || catMatch || subcatMatch;
+      const advMatch = ad.advertiser_name ? ad.advertiser_name.toLowerCase().includes(activeSearch) : false;
+      matchesSearch = titleMatch || descMatch || catMatch || subcatMatch || advMatch;
     }
 
     return matchesCategory && matchesSearch;
@@ -127,7 +129,6 @@ export default function Home() {
 
   const relatedAds = ads.filter((ad) => !filteredAds.some((f) => f.id === ad.id));
 
-  // FILTRAGEM RIGOROSA PARA O COMÉRCIO LOCAL: Proíbe expressamente nomes que começam com "Anunciante" ou user_type "client"
   const filteredProfiles = profiles.filter(profile => {
     const sName = profile.store_name || profile.name || "";
     
@@ -245,22 +246,25 @@ export default function Home() {
     const storeProfile = ad.user_id ? profilesMap[ad.user_id] : null;
     const storeNameRaw = storeProfile ? (storeProfile.store_name || storeProfile.name || "") : "";
     
-    // EXIBE A BARRA AZUL APENAS SE TIVER LOJA REAL E O NOME NÃO COMEÇAR COM "Anunciante"
     const isRealStore = storeProfile && 
       storeProfile.user_type !== "client" && 
       !storeNameRaw.toLowerCase().startsWith("anunciante");
 
     const storeName = isRealStore ? storeNameRaw : null;
     const isFoodStore = storeProfile?.store_type === "food";
+    const hasCustomAdvertiser = !storeName && ad.advertiser_name && ad.advertiser_name.trim() !== "";
 
     const formattedPrice = ad.price ? `R$ ${ad.price.toFixed(2)}` : "A combinar";
-    const imageText = ad.image_url ? `\n🖼️ Foto do produto: ${ad.image_url}` : "";
+    const imageText = ad.image_url ? `${ad.image_url}` : "Nenhuma foto informada";
+    const adLink = typeof window !== "undefined" ? `${window.location.origin}` : "";
 
-    const whatsappMessage = `🚀 Estou vindo do ConectaCidadeSp e tenho interesse neste produto:
+    const whatsappMessage = `🚀 Estou vindo do *Conecta Cidade Sp* e tenho interesse neste produto:
 
 📦 ${ad.title}
-💰 Preço: ${formattedPrice}
-📝 Detalhes: ${ad.description}${imageText}`;
+💰 ${formattedPrice}
+📝 Detalhes: ${ad.description}
+🖼️ Foto do produto: ${imageText}
+🔗 Ver anúncio: ${adLink}`;
 
     return (
       <div key={ad.id} style={{ 
@@ -272,7 +276,6 @@ export default function Home() {
         flexDirection: "column", 
         boxShadow: "0 10px 25px -5px rgba(0, 0, 0, 0.05), 0 8px 10px -6px rgba(0, 0, 0, 0.05)"
       }}>
-        {/* BARRA AZUL SUPERIOR EXCLUSIVA PARA LOJAS REAIS (NUNCA ANUNCIANTES COMUNS) */}
         {storeName && ad.user_id && (
           <a
             href={`/shop/${ad.user_id}`}
@@ -295,9 +298,29 @@ export default function Home() {
           </a>
         )}
 
-        <div style={{ width: "100%", height: 200, backgroundColor: "#F8FAFC", display: "flex", alignItems: "center", justifyContent: "center", padding: 10, borderBottom: "1px solid #F1F5F9" }}>
+        {hasCustomAdvertiser && (
+          <div
+            style={{ 
+              backgroundColor: "#FFFFFF", 
+              padding: "8px 10px", 
+              textAlign: "center", 
+              borderBottom: "1px solid #E2E8F0", 
+              width: "100%", 
+              display: "flex", 
+              alignItems: "center", 
+              justifyContent: "center", 
+              gap: 6 
+            }}
+          >
+            <span style={{ fontSize: 13, fontWeight: "bold", color: "#000000" }}>
+              👤 {ad.advertiser_name}
+            </span>
+          </div>
+        )}
+
+        <div style={{ width: "100%", height: 190, backgroundColor: "#F8FAFC", display: "flex", alignItems: "center", justifyContent: "center", overflow: "hidden", borderBottom: "1px solid #F1F5F9", position: "relative" }}>
           {ad.image_url ? (
-            <img src={ad.image_url} alt={ad.title} style={{ maxWidth: "100%", maxHeight: "100%", objectFit: "contain" }} />
+            <img src={ad.image_url} alt={ad.title} style={{ width: "100%", height: "100%", objectFit: "cover", objectPosition: "center" }} />
           ) : (
             <span style={{ color: "#94A3B8", fontSize: 14 }}>Sem Foto</span>
           )}
@@ -308,7 +331,9 @@ export default function Home() {
             <span style={{ fontSize: 11, backgroundColor: "#FFEDD5", color: "#C2410C", padding: "3px 10px", borderRadius: 6, fontWeight: "bold", display: "inline-block" }}>
               {ad.category}
             </span>
-            <h4 style={{ fontSize: 16, margin: "10px 0 6px", color: "#0B2545", fontWeight: "bold" }}>{ad.title}</h4>
+            <h4 style={{ fontSize: 16, margin: "10px 0 6px", color: "#0B2545", fontWeight: "bold", overflow: "hidden", textOverflow: "ellipsis", display: "-webkit-box", WebkitLineClamp: 2, WebkitBoxOrient: "vertical" }}>
+              {ad.title}
+            </h4>
             <p style={{ fontSize: 13, color: "#64748B", margin: 0, height: 38, overflow: "hidden", textOverflow: "ellipsis" }}>{ad.description}</p>
           </div>
           

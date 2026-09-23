@@ -3,11 +3,6 @@ import Header from "@/components/Header";
 export const metadata = {
   title: "Conecta Cidade SP",
   description: "Classificados da sua cidade",
-  icons: {
-    icon: "https://ahiyxrdplhecskzoiogd.supabase.co/storage/v1/object/public/site-assets/Logo%20redonda.png",
-    shortcut: "https://ahiyxrdplhecskzoiogd.supabase.co/storage/v1/object/public/site-assets/Logo%20redonda.png",
-    apple: "https://ahiyxrdplhecskzoiogd.supabase.co/storage/v1/object/public/site-assets/Logo%20redonda.png",
-  },
 };
 
 export default function RootLayout({
@@ -15,8 +10,15 @@ export default function RootLayout({
 }: {
   children: React.ReactNode;
 }) {
+  const faviconUrl = "https://ahiyxrdplhecskzoiogd.supabase.co/storage/v1/object/public/site-assets/Logo%20redonda.png?v=3";
+
   return (
     <html lang="pt-BR">
+      <head>
+        <link rel="icon" href={faviconUrl} />
+        <link rel="shortcut icon" href={faviconUrl} />
+        <link rel="apple-touch-icon" href={faviconUrl} />
+      </head>
       <body style={{ fontFamily: "sans-serif", margin: 0, padding: 0, backgroundColor: "#F8FAFC", minHeight: "100vh", display: "flex", flexDirection: "column" }}>
         
         {/* 🔹 CABEÇALHO GLOBAL DINÂMICO */}
