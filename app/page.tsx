@@ -213,7 +213,7 @@ export default function Home() {
               {storeName}
             </h4>
             <p style={{ fontSize: 12, color: "#64748B", margin: "0 0 10px" }}>📍 {profile.city || selectedCity}</p>
-            <p style={{ fontSize: 13, color: "#334155", margin: 0, height: 45, overflow: "hidden", textOverflow: "ellipsis" }}>
+            <p style={{ fontSize: 13, color: "#334155", margin: "0 0 10px 0", lineHeight: "1.4" }}>
               {storeBio}
             </p>
           </div>
@@ -331,10 +331,13 @@ export default function Home() {
             <span style={{ fontSize: 11, backgroundColor: "#FFEDD5", color: "#C2410C", padding: "3px 10px", borderRadius: 6, fontWeight: "bold", display: "inline-block" }}>
               {ad.category}
             </span>
-            <h4 style={{ fontSize: 16, margin: "10px 0 6px", color: "#0B2545", fontWeight: "bold", overflow: "hidden", textOverflow: "ellipsis", display: "-webkit-box", WebkitLineClamp: 2, WebkitBoxOrient: "vertical" }}>
+            <h4 style={{ fontSize: 16, margin: "10px 0 6px", color: "#0B2545", fontWeight: "bold" }}>
               {ad.title}
             </h4>
-            <p style={{ fontSize: 13, color: "#64748B", margin: 0, height: 38, overflow: "hidden", textOverflow: "ellipsis" }}>{ad.description}</p>
+            {/* Descrição otimizada sem limite de altura fixa para mostrar o texto inteiro */}
+            <p style={{ fontSize: 13, color: "#64748B", margin: "0 0 10px 0", lineHeight: "1.4", wordBreak: "break-word" }}>
+              {ad.description}
+            </p>
           </div>
           
           <div style={{ marginTop: 14 }}>

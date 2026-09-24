@@ -90,7 +90,6 @@ export default function ProfileDashboard() {
         .eq("id", user.id)
         .single();
 
-      // Identifica se é anunciante comum suportando AMBOS os padrões (@anunciante.com e phone_...@client.conectacidade.local)
       const isClientUser = 
         user.email?.includes("@anunciante.com") || 
         user.email?.includes("phone_") || 
@@ -245,6 +244,67 @@ export default function ProfileDashboard() {
       alert("Anúncio removido!");
     } else {
       alert("Erro ao remover anúncio: " + error.message);
+    }
+  };
+
+  // 🔄 Botão Vendido com try/catch totalmente blindado
+  const handleMarkAsSold = async (adId: string, adTitle: string) => {
+    if (!window.confirm(`Marcar "${adTitle}" como vendido? O anúncio será encerrado e removido do seu painel.`)) return;
+
+    try {
+      await supabase.from("sales_stats").insert([
+        { user_id: user.id, ad_id: adId, title: adTitle, sold_at: new Date().toISOString() }
+      ]);
+    } catch (e) {
+      // Ignora se a tabela de estatísticas não estiver criada ainda
+    }
+
+    const { error } = await supabase.from("ads").delete().eq("id", adId);
+
+    if (!error) {
+      setMyAds(myAds.filter(ad => ad.id !== adId));
+      alert("Parabéns pela venda! O anúncio foi encerrado com sucesso.");
+    } else {
+      alert("Erro ao atualizar o anúncio: " + error.message);
+    }
+  };
+
+  // ⚡ Destacar Anúncio por 24h
+  const handleToggleFeature = async (adId: string, currentFeatured: boolean, adImageUrl?: string | null) => {
+    if (currentFeatured) {
+      const { error } = await supabase.from("stories").delete().eq("ad_id", adId);
+      if (!error) {
+        setMyAds(myAds.map(a => a.id === adId ? { ...a, is_featured: false } : a));
+        alert("Destaque removido.");
+      }
+    } else {
+      const expiresAt = new Date(Date.now() + 24 * 60 * 60 * 1000).toISOString();
+      const { error } = await supabase.from("stories").upsert([
+        { 
+          profile_id: user.id, 
+          ad_id: adId, 
+          image_url: adImageUrl || "", 
+          expires_at: expiresAt 
+        }
+      ]);
+      if (!error) {
+        setMyAds(myAds.map(a => a.id === adId ? { ...a, is_featured: true } : a));
+        alert("⚡ Anúncio destacado com sucesso por 24 horas!");
+      } else {
+        alert("Erro ao destacar anúncio: " + error.message);
+      }
+    }
+  };
+
+  // 👁️ Ocultar / Exibir Anúncio
+  const handleToggleHide = async (adId: string, currentHidden: boolean) => {
+    const newStatus = !currentHidden;
+    const { error } = await supabase.from("ads").update({ is_hidden: newStatus }).eq("id", adId);
+
+    if (!error) {
+      setMyAds(myAds.map(a => a.id === adId ? { ...a, is_hidden: newStatus } : a));
+    } else {
+      alert("Erro ao alterar visibilidade: " + error.message);
     }
   };
 
@@ -544,7 +604,32 @@ export default function ProfileDashboard() {
                         </div>
                       </div>
 
-                      <div style={{ display: "flex", gap: 6, flexShrink: 0, marginTop: 8 }}>
+                      <div style={{ display: "flex", gap: 6, flexShrink: 0, marginTop: 8, flexWrap: "wrap" }}>
+                        {userType === "store" ? (
+                          <>
+                            <button 
+                              onClick={() => handleToggleFeature(ad.id, !!ad.is_featured, ad.image_url)}
+                              style={{ padding: "8px 10px", backgroundColor: ad.is_featured ? "#FEF3C7" : "#10B981", color: ad.is_featured ? "#D97706" : "#fff", border: "none", borderRadius: 6, fontSize: 12, fontWeight: "bold", cursor: "pointer" }}
+                            >
+                              {ad.is_featured ? "⭐ Destacado" : "⚡ Destacar 24h"}
+                            </button>
+
+                            <button 
+                              onClick={() => handleToggleHide(ad.id, !!ad.is_hidden)}
+                              style={{ padding: "8px 10px", backgroundColor: "#FEF9C3", color: "#854D0E", border: "none", borderRadius: 6, fontSize: 12, fontWeight: "bold", cursor: "pointer" }}
+                            >
+                              {ad.is_hidden ? "Exibir" : "Ocultar"}
+                            </button>
+                          </>
+                        ) : (
+                          <button 
+                            onClick={() => handleMarkAsSold(ad.id, ad.title)}
+                            style={{ padding: "8px 12px", backgroundColor: "#DC2626", color: "#fff", border: "none", borderRadius: 6, fontSize: 12, fontWeight: "bold", cursor: "pointer" }}
+                          >
+                            ✅ Vendido
+                          </button>
+                        )}
+
                         <button 
                           onClick={() => window.location.href = `/edit-ad/${ad.id}`}
                           style={{ padding: "8px 12px", backgroundColor: "#E2E8F0", color: "#1E293B", border: "none", borderRadius: 6, fontSize: 12, fontWeight: "bold", cursor: "pointer" }}
