@@ -3,6 +3,7 @@
 import { useState, useEffect } from "react";
 import { supabase } from "@/lib/supabase";
 import StoriesBar from "@/components/StoriesBar";
+import AffiliateRotativeCard from "@/components/AffiliateRotativeCard";
 
 interface Ad {
   id: string;
@@ -334,7 +335,6 @@ export default function Home() {
             <h4 style={{ fontSize: 16, margin: "10px 0 6px", color: "#0B2545", fontWeight: "bold" }}>
               {ad.title}
             </h4>
-            {/* Descrição otimizada sem limite de altura fixa para mostrar o texto inteiro */}
             <p style={{ fontSize: 13, color: "#64748B", margin: "0 0 10px 0", lineHeight: "1.4", wordBreak: "break-word" }}>
               {ad.description}
             </p>
@@ -498,7 +498,20 @@ export default function Home() {
               <>
                 {filteredAds.length > 0 ? (
                   <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(230px, 1fr))", gap: 20 }}>
-                    {filteredAds.map(renderAdCard)}
+                    {filteredAds.map((ad, index) => {
+                      const elements = [renderAdCard(ad)];
+
+                      // 💡 REGRA DE OURO: A cada 4 anúncios de usuários, injetamos 1 carrossel rotativo de afiliados camuflado!
+                      if ((index + 1) % 4 === 0) {
+                        elements.push(
+                          <div key={`affiliate-slot-${index}`} style={{ display: "flex", alignItems: "center", justifyContent: "center" }}>
+                            <AffiliateRotativeCard intervalSeconds={5} />
+                          </div>
+                        );
+                      }
+
+                      return elements;
+                    })}
                   </div>
                 ) : (
                   <div style={{ textAlign: "center", padding: 30, backgroundColor: "#fff", border: "1px dashed #CBD5E1", borderRadius: 8, marginBottom: 30 }}>
