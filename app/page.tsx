@@ -501,11 +501,12 @@ export default function Home() {
                     {filteredAds.map((ad, index) => {
                       const elements = [renderAdCard(ad)];
 
-                      // 💡 REGRA DE OURO: A cada 4 anúncios de usuários, injetamos 1 carrossel rotativo de afiliados camuflado!
+                      // 💡 REGRA DE OURO ATUALIZADA: A cada 4 anúncios de usuários, injetamos 1 card rotativo com índice sequencial cíclico
                       if ((index + 1) % 4 === 0) {
+                        const affiliateSlotIndex = Math.floor(index / 4);
                         elements.push(
                           <div key={`affiliate-slot-${index}`} style={{ display: "flex", alignItems: "center", justifyContent: "center" }}>
-                            <AffiliateRotativeCard intervalSeconds={5} />
+                            <AffiliateRotativeCard intervalSeconds={5} affiliateIndex={affiliateSlotIndex} />
                           </div>
                         );
                       }

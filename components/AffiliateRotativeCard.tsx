@@ -13,7 +13,12 @@ interface AffiliateAd {
   platform: string;
 }
 
-export default function AffiliateRotativeCard({ intervalSeconds = 5 }: { intervalSeconds?: number }) {
+interface AffiliateCardProps {
+  intervalSeconds?: number;
+  affiliateIndex?: number; // 👈 Adicionada a propriedade que faltava para aceitar o índice sequencial
+}
+
+export default function AffiliateRotativeCard({ intervalSeconds = 5, affiliateIndex = 0 }: AffiliateCardProps) {
   const [ads, setAds] = useState<AffiliateAd[]>([]);
   const [currentIndex, setCurrentIndex] = useState(0);
   const [loading, setLoading] = useState(true);
@@ -29,12 +34,15 @@ export default function AffiliateRotativeCard({ intervalSeconds = 5 }: { interva
 
       if (data && data.length > 0) {
         setAds(data);
+        // 👈 AQUI ESTÁ O SEGREDO: Definimos o índice inicial com base no slot da página de forma cíclica (ex: resto da divisão)
+        const initialPosition = affiliateIndex % data.length;
+        setCurrentIndex(initialPosition);
       }
       setLoading(false);
     }
 
     fetchAffiliates();
-  }, []);
+  }, [affiliateIndex]);
 
   // Temporizador para o carrossel automático (pausa se o mouse estiver em cima)
   useEffect(() => {
@@ -60,11 +68,8 @@ export default function AffiliateRotativeCard({ intervalSeconds = 5 }: { interva
   const isAmazon = platformLower.includes("amazon");
   const isMercadoLivre = platformLower.includes("mercado") || platformLower.includes("ml");
 
-  // Cores oficiais dos marketplaces: Shopee (Laranja), Amazon (Amarelo/Laranja), Mercado Livre (Amarelo/Azul ou Azul Oficial)
   const headerBgColor = isShopee ? "#EE4D2D" : isAmazon ? "#FF9900" : "#FFE600";
-  const headerTextColor = isAmazon || isMercadoLivre ? "#1E293B" : "#FFFFFF"; // Texto escuro para fundos claros (ML e Amazon)
-  
-  // Nomes padronizados para "Achadinhos"
+  const headerTextColor = isAmazon || isMercadoLivre ? "#1E293B" : "#FFFFFF";
   const badgeText = isShopee ? "🛒 Achadinhos Shopee" : isAmazon ? "📦 Achadinhos Amazon" : "📦 Achadinhos Mercado Livre";
 
   const handlePrev = (e: React.MouseEvent) => {
@@ -95,7 +100,6 @@ export default function AffiliateRotativeCard({ intervalSeconds = 5 }: { interva
         height: "100%"
       }}
     >
-      {/* Etiqueta Superior com a cor e identidade do marketplace */}
       <div style={{ 
         backgroundColor: headerBgColor, 
         padding: "8px 10px", 
@@ -111,7 +115,6 @@ export default function AffiliateRotativeCard({ intervalSeconds = 5 }: { interva
         </span>
       </div>
 
-      {/* Imagem do Produto inteira sem cortes */}
       <div style={{ width: "100%", height: 235, backgroundColor: "#F8FAFC", display: "flex", alignItems: "center", justifyContent: "center", overflow: "hidden", borderBottom: "1px solid #F1F5F9", position: "relative", padding: 8, boxSizing: "border-box" }}>
         <img 
           src={currentAd.image_url} 
@@ -119,7 +122,6 @@ export default function AffiliateRotativeCard({ intervalSeconds = 5 }: { interva
           style={{ width: "100%", height: "100%", objectFit: "contain", objectPosition: "center", transition: "transform 0.3s ease" }} 
         />
         
-        {/* Setas de Navegação Manual */}
         {ads.length > 1 && (
           <>
             <button 
@@ -149,13 +151,11 @@ export default function AffiliateRotativeCard({ intervalSeconds = 5 }: { interva
           </>
         )}
 
-        {/* Indicador de Paginação */}
         <div style={{ position: "absolute", bottom: 8, right: 8, backgroundColor: "rgba(0,0,0,0.6)", color: "#fff", fontSize: 10, padding: "2px 6px", borderRadius: 4 }}>
           🔄 {currentIndex + 1}/{ads.length}
         </div>
       </div>
 
-      {/* Detalhes do Produto */}
       <div style={{ padding: 16, flex: 1, display: "flex", flexDirection: "column", justifyContent: "space-between" }}>
         <div>
           <span style={{ fontSize: 11, backgroundColor: "#FEF3C7", color: "#D97706", padding: "2px 8px", borderRadius: 6, fontWeight: "bold", display: "inline-block" }}>
