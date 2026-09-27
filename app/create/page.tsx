@@ -117,10 +117,11 @@ export default function CreateAd() {
   const [checkingAuth, setCheckingAuth] = useState(true);
   const [city, setCity] = useState("Rubiácea-SP");
   
-  // 🔄 Estados dos Produtos Afiliados (Tabela correta: affiliate_ads)
+  // 🔄 Estados dos Produtos Afiliados (Laterais e Mobile)
   const [affiliateProducts, setAffiliateProducts] = useState<any[]>([]);
   const [leftIndex, setLeftIndex] = useState(0);
   const [rightIndex, setRightIndex] = useState(0);
+  const [mobileIndex, setMobileIndex] = useState(0);
 
   const router = useRouter();
 
@@ -179,8 +180,8 @@ export default function CreateAd() {
       
       if (affiliates && affiliates.length > 0) {
         setAffiliateProducts(affiliates);
-        // Inicializa o lado direito deslocado pela metade para evitar repetição síncrona
         setRightIndex(Math.floor(affiliates.length / 2));
+        setMobileIndex(0);
       }
 
       setCheckingAuth(false);
@@ -196,6 +197,7 @@ export default function CreateAd() {
     const interval = setInterval(() => {
       setLeftIndex((prev) => (prev + 1) % affiliateProducts.length);
       setRightIndex((prev) => (prev - 1 + affiliateProducts.length) % affiliateProducts.length);
+      setMobileIndex((prev) => (prev + 1) % affiliateProducts.length);
     }, 5000);
 
     return () => clearInterval(interval);
@@ -303,9 +305,10 @@ export default function CreateAd() {
     return <p style={{ textAlign: "center", marginTop: 100, fontFamily: "sans-serif", color: "#64748B" }}>Verificando autenticação...</p>;
   }
 
-  // 🧩 Extração dos produtos correntes para as laterais
+  // 🧩 Extração dos produtos correntes para as laterais e mobile
   const leftProduct = affiliateProducts.length > 0 ? affiliateProducts[leftIndex] : null;
   const rightProduct = affiliateProducts.length > 0 ? affiliateProducts[rightIndex] : null;
+  const mobileProduct = affiliateProducts.length > 0 ? affiliateProducts[mobileIndex] : null;
 
   // Função auxiliar de renderização de card lateral idêntica ao componente original
   const renderSideCard = (product: any) => {
@@ -391,113 +394,126 @@ export default function CreateAd() {
 
   return (
     <main style={{ padding: "30px 15px", backgroundColor: "#F8FAFC", minHeight: "100vh", fontFamily: "sans-serif" }}>
-      {/* Container Principal com Layout de 3 Colunas */}
-      <div style={{ display: "flex", justifyContent: "center", alignItems: "flex-start", gap: "25px", maxWidth: "1250px", margin: "0 auto" }}>
+      {/* Container Principal */}
+      <div style={{ display: "flex", justifyContent: "center", alignItems: "flex-start", gap: "25px", maxWidth: "1250px", margin: "0 auto", flexDirection: "column" }}>
         
-        {/* 📢 Banner Lateral Esquerdo (Sticky) */}
-        <aside style={{ display: "none", flexDirection: "column", width: "260px", position: "sticky", top: "20px" }} className="side-banner-left">
-          {renderSideCard(leftProduct)}
-        </aside>
+        <div style={{ display: "flex", justifyContent: "center", alignItems: "flex-start", gap: "25px", width: "100%" }}>
+          {/* 📢 Banner Lateral Esquerdo (Sticky apenas no Desktop) */}
+          <aside style={{ display: "none", flexDirection: "column", width: "260px", position: "sticky", top: "20px" }} className="side-banner-left">
+            {renderSideCard(leftProduct)}
+          </aside>
 
-        {/* 📝 Formulário Central de Criação de Anúncio */}
-        <div style={{ flex: "1", maxWidth: "540px", border: "1px solid #E2E8F0", padding: "30px", borderRadius: "12px", backgroundColor: "#fff", boxShadow: "0 4px 6px -1px rgba(0,0,0,0.1)" }}>
-          <h1 style={{ fontSize: 24, marginBottom: 8, fontWeight: "bold", textAlign: "center", color: "#0F4C81" }}>📢 Criar Novo Anúncio</h1>
-          <p style={{ color: "#64748B", marginBottom: 25, fontSize: 14, textAlign: "center" }}>Preencha os campos abaixo para publicar seu produto ou serviço.</p>
+          {/* 📝 Formulário Central de Criação de Anúncio */}
+          <div style={{ flex: "1", maxWidth: "540px", width: "100%", border: "1px solid #E2E8F0", padding: "30px", borderRadius: "12px", backgroundColor: "#fff", boxShadow: "0 4px 6px -1px rgba(0,0,0,0.1)", boxSizing: "border-box", margin: "0 auto" }}>
+            <h1 style={{ fontSize: 24, marginBottom: 8, fontWeight: "bold", textAlign: "center", color: "#0F4C81" }}>📢 Criar Novo Anúncio</h1>
+            <p style={{ color: "#64748B", marginBottom: 25, fontSize: 14, textAlign: "center" }}>Preencha os campos abaixo para publicar seu produto ou serviço.</p>
 
-          <form onSubmit={handleCreate} style={{ display: "flex", flexDirection: "column", gap: 16 }}>
-            
-            {isAnuncianteComum && (
-              <div style={{ display: "flex", flexDirection: "column", gap: 5 }}>
-                <label style={{ fontSize: 14, fontWeight: "bold", color: "#1E293B" }}>👤 Nome de Quem está Anunciando:</label>
-                <input 
-                  placeholder="Ex: João da Silva / Dona Maria / Oficina do Zé" 
-                  value={customAdvertiserName} 
-                  onChange={(e) => setCustomAdvertiserName(e.target.value)} 
-                  style={{ padding: 12, border: "1px solid #CBD5E1", borderRadius: 6, fontSize: 15 }} 
-                />
-                <span style={{ fontSize: 12, color: "#64748B" }}>Aparecerá em destaque no topo do anúncio para contato direto.</span>
-              </div>
-            )}
-
-            <input placeholder="Título do Anúncio" value={title} onChange={(e) => setTitle(e.target.value)} required style={{ padding: 12, border: "1px solid #CBD5E1", borderRadius: 6, fontSize: 15 }} />
-            <textarea placeholder="Descrição Detalhada" value={description} onChange={(e) => setDescription(e.target.value)} required rows={3} style={{ padding: 12, border: "1px solid #CBD5E1", borderRadius: 6, fontSize: 15, resize: "none" }} />
-            
-            <input 
-              placeholder="Preço (Ex: 50,00) - Opcional" 
-              type="text" 
-              value={priceDisplay} 
-              onChange={handlePriceChange} 
-              style={{ padding: 12, border: "1px solid #CBD5E1", borderRadius: 6, fontSize: 15 }} 
-            />
-            
-            <div style={{ display: "flex", flexDirection: "column", gap: 5 }}>
-              <label style={{ fontSize: 14, fontWeight: "bold", color: "#1E293B" }}>📁 Selecione a Categoria:</label>
-              <select value={category} onChange={handleCategoryChange} required style={{ padding: 12, border: "1px solid #CBD5E1", borderRadius: 6, fontSize: 15, backgroundColor: "#fff", cursor: "pointer" }}>
-                <option value="">-- Escolha uma categoria --</option>
-                {Object.keys(categoriesData).map((cat) => (
-                  <option key={cat} value={cat}>{categoriesData[cat].icon} {cat}</option>
-                ))}
-              </select>
-            </div>
-
-            {userType === "store" && category && storeType === "food" ? (
-              <div style={{ display: "flex", flexDirection: "column", gap: 5 }}>
-                <label style={{ fontSize: 14, fontWeight: "bold", color: "#1E293B" }}>🍔 Categoria no Cardápio (Subcategoria):</label>
-                <input
-                  type="text"
-                  placeholder="Ex: Lanches, Bebidas, Porções, Sobremesas..."
-                  value={subcategory}
-                  onChange={(e) => setSubcategory(e.target.value)}
-                  required
-                  style={{ padding: 12, border: "1px solid #CBD5E1", borderRadius: 6, fontSize: 15 }}
-                />
-              </div>
-            ) : (
-              category && categoriesData[category]?.subs.length > 0 && (
+            <form onSubmit={handleCreate} style={{ display: "flex", flexDirection: "column", gap: 16 }}>
+              
+              {isAnuncianteComum && (
                 <div style={{ display: "flex", flexDirection: "column", gap: 5 }}>
-                  <label style={{ fontSize: 14, fontWeight: "bold", color: "#1E293B" }}>📂 Escolha uma subcategoria de {category}:</label>
-                  <select value={subcategory} onChange={(e) => setSubcategory(e.target.value)} required style={{ padding: 12, border: "1px solid #CBD5E1", borderRadius: 6, fontSize: 15, backgroundColor: "#fff", cursor: "pointer" }}>
-                    <option value="">-- Escolha uma subcategoria --</option>
-                    {categoriesData[category].subs.map((sub) => (
-                      <option key={sub} value={sub}>🔹 {sub}</option>
-                    ))}
-                  </select>
+                  <label style={{ fontSize: 14, fontWeight: "bold", color: "#1E293B" }}>👤 Nome de Quem está Anunciando:</label>
+                  <input 
+                    placeholder="Ex: João da Silva / Dona Maria / Oficina do Zé" 
+                    value={customAdvertiserName} 
+                    onChange={(e) => setCustomAdvertiserName(e.target.value)} 
+                    style={{ padding: 12, border: "1px solid #CBD5E1", borderRadius: 6, fontSize: 15, width: "100%", boxSizing: "border-box" }} 
+                  />
+                  <span style={{ fontSize: 12, color: "#64748B" }}>Aparecerá em destaque no topo do anúncio para contato direto.</span>
                 </div>
-              )
-            )}
+              )}
 
-            <input 
-              placeholder={profileWhatsapp ? `WhatsApp (Ex: 18999998888 ou texto livre)` : "WhatsApp de Contato (Número ou texto livre)"} 
-              value={whatsapp} 
-              onChange={(e) => setWhatsapp(e.target.value)} 
-              required={!profileWhatsapp}
-              style={{ padding: 12, border: "1px solid #CBD5E1", borderRadius: 6, fontSize: 15 }} 
-            />
-            
-            <div style={{ display: "flex", flexDirection: "column", gap: 5 }}>
-              <label style={{ fontSize: 14, fontWeight: "bold", color: "#1E293B" }}>📸 Foto do Produto (Opcional):</label>
-              <input type="file" accept="image/*" onChange={(e) => e.target.files && setImageFile(e.target.files[0])} style={{ fontSize: 14, cursor: "pointer" }} />
-              <span style={{ fontSize: 12, color: "#64748B" }}>A imagem será otimizada e redimensionada automaticamente.</span>
-            </div>
+              <input placeholder="Título do Anúncio" value={title} onChange={(e) => setTitle(e.target.value)} required style={{ padding: 12, border: "1px solid #CBD5E1", borderRadius: 6, fontSize: 15, width: "100%", boxSizing: "border-box" }} />
+              <textarea placeholder="Descrição Detalhada" value={description} onChange={(e) => setDescription(e.target.value)} required rows={3} style={{ padding: 12, border: "1px solid #CBD5E1", borderRadius: 6, fontSize: 15, resize: "none", width: "100%", boxSizing: "border-box" }} />
+              
+              <input 
+                placeholder="Preço (Ex: 50,00) - Opcional" 
+                type="text" 
+                value={priceDisplay} 
+                onChange={handlePriceChange} 
+                style={{ padding: 12, border: "1px solid #CBD5E1", borderRadius: 6, fontSize: 15, width: "100%", boxSizing: "border-box" }} 
+              />
+              
+              <div style={{ display: "flex", flexDirection: "column", gap: 5 }}>
+                <label style={{ fontSize: 14, fontWeight: "bold", color: "#1E293B" }}>📁 Selecione a Categoria:</label>
+                <select value={category} onChange={handleCategoryChange} required style={{ padding: 12, border: "1px solid #CBD5E1", borderRadius: 6, fontSize: 15, backgroundColor: "#fff", cursor: "pointer", width: "100%", boxSizing: "border-box" }}>
+                  <option value="">-- Escolha uma categoria --</option>
+                  {Object.keys(categoriesData).map((cat) => (
+                    <option key={cat} value={cat}>{categoriesData[cat].icon} {cat}</option>
+                  ))}
+                </select>
+              </div>
 
-            <button type="submit" disabled={loading} style={{ padding: 14, backgroundColor: "#0F4C81", color: "white", border: "none", borderRadius: 6, fontSize: 16, fontWeight: "bold", cursor: "pointer", marginTop: 10 }}>
-              {loading ? "Otimizando imagem e enviando..." : "🚀 Publicar Anúncio"}
-            </button>
-          </form>
+              {userType === "store" && category && storeType === "food" ? (
+                <div style={{ display: "flex", flexDirection: "column", gap: 5 }}>
+                  <label style={{ fontSize: 14, fontWeight: "bold", color: "#1E293B" }}>🍔 Categoria no Cardápio (Subcategoria):</label>
+                  <input
+                    type="text"
+                    placeholder="Ex: Lanches, Bebidas, Porções, Sobremesas..."
+                    value={subcategory}
+                    onChange={(e) => setSubcategory(e.target.value)}
+                    required
+                    style={{ padding: 12, border: "1px solid #CBD5E1", borderRadius: 6, fontSize: 15, width: "100%", boxSizing: "border-box" }}
+                  />
+                </div>
+              ) : (
+                category && categoriesData[category]?.subs.length > 0 && (
+                  <div style={{ display: "flex", flexDirection: "column", gap: 5 }}>
+                    <label style={{ fontSize: 14, fontWeight: "bold", color: "#1E293B" }}>📂 Escolha uma subcategoria de {category}:</label>
+                    <select value={subcategory} onChange={(e) => setSubcategory(e.target.value)} required style={{ padding: 12, border: "1px solid #CBD5E1", borderRadius: 6, fontSize: 15, backgroundColor: "#fff", cursor: "pointer", width: "100%", boxSizing: "border-box" }}>
+                      <option value="">-- Escolha uma subcategoria --</option>
+                      {categoriesData[category].subs.map((sub) => (
+                        <option key={sub} value={sub}>🔹 {sub}</option>
+                      ))}
+                    </select>
+                  </div>
+                )
+              )}
+
+              <input 
+                placeholder={profileWhatsapp ? `WhatsApp (Ex: 18999998888 ou texto livre)` : "WhatsApp de Contato (Número ou texto livre)"} 
+                value={whatsapp} 
+                onChange={(e) => setWhatsapp(e.target.value)} 
+                required={!profileWhatsapp}
+                style={{ padding: 12, border: "1px solid #CBD5E1", borderRadius: 6, fontSize: 15, width: "100%", boxSizing: "border-box" }} 
+              />
+              
+              <div style={{ display: "flex", flexDirection: "column", gap: 5 }}>
+                <label style={{ fontSize: 14, fontWeight: "bold", color: "#1E293B" }}>📸 Foto do Produto (Opcional):</label>
+                <input type="file" accept="image/*" onChange={(e) => e.target.files && setImageFile(e.target.files[0])} style={{ fontSize: 14, cursor: "pointer", width: "100%", boxSizing: "border-box" }} />
+                <span style={{ fontSize: 12, color: "#64748B" }}>A imagem será otimizada e redimensionada automaticamente.</span>
+              </div>
+
+              <button type="submit" disabled={loading} style={{ padding: 14, backgroundColor: "#0F4C81", color: "white", border: "none", borderRadius: 6, fontSize: 16, fontWeight: "bold", cursor: "pointer", marginTop: 10, width: "100%" }}>
+                {loading ? "Otimizando imagem e enviando..." : "🚀 Publicar Anúncio"}
+              </button>
+            </form>
+          </div>
+
+          {/* 📢 Banner Lateral Direito (Sticky apenas no Desktop) */}
+          <aside style={{ display: "none", flexDirection: "column", width: "260px", position: "sticky", top: "20px" }} className="side-banner-right">
+            {renderSideCard(rightProduct)}
+          </aside>
         </div>
 
-        {/* 📢 Banner Lateral Direito (Sticky) */}
-        <aside style={{ display: "none", flexDirection: "column", width: "260px", position: "sticky", top: "20px" }} className="side-banner-right">
-          {renderSideCard(rightProduct)}
-        </aside>
+        {/* 📱 Banner exclusivo para Celular (Aparece abaixo do formulário em telas pequenas) */}
+        <div style={{ width: "100%", maxWidth: "540px", margin: "20px auto 0 auto" }} className="mobile-banner-container">
+          {renderSideCard(mobileProduct)}
+        </div>
 
       </div>
 
-      {/* Regra CSS para exibir as laterais apenas em desktops */}
+      {/* Regras CSS Responsivas: Exibe laterais no Desktop e oculta o extra mobile; Inverte no Celular */}
       <style jsx global>{`
+        .mobile-banner-container {
+          display: block;
+        }
         @media (min-width: 1024px) {
           .side-banner-left, .side-banner-right {
             display: flex !important;
+          }
+          .mobile-banner-container {
+            display: none !important;
           }
         }
       `}</style>
