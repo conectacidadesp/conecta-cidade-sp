@@ -14,10 +14,11 @@ export default function Register() {
   
   const [loading, setLoading] = useState(false);
 
-  // 🔄 Estados dos Produtos Afiliados (Laterais)
+  // 🔄 Estados dos Produtos Afiliados (Laterais e Mobile)
   const [affiliateProducts, setAffiliateProducts] = useState<any[]>([]);
   const [leftIndex, setLeftIndex] = useState(0);
   const [rightIndex, setRightIndex] = useState(0);
+  const [mobileIndex, setMobileIndex] = useState(0);
 
   useEffect(() => {
     async function fetchAffiliates() {
@@ -30,6 +31,7 @@ export default function Register() {
       if (data && data.length > 0) {
         setAffiliateProducts(data);
         setRightIndex(Math.floor(data.length / 2));
+        setMobileIndex(0);
       }
     }
     fetchAffiliates();
@@ -42,6 +44,7 @@ export default function Register() {
     const interval = setInterval(() => {
       setLeftIndex((prev) => (prev + 1) % affiliateProducts.length);
       setRightIndex((prev) => (prev - 1 + affiliateProducts.length) % affiliateProducts.length);
+      setMobileIndex((prev) => (prev + 1) % affiliateProducts.length);
     }, 5000);
 
     return () => clearInterval(interval);
@@ -129,6 +132,7 @@ export default function Register() {
 
   const leftProduct = affiliateProducts.length > 0 ? affiliateProducts[leftIndex] : null;
   const rightProduct = affiliateProducts.length > 0 ? affiliateProducts[rightIndex] : null;
+  const mobileProduct = affiliateProducts.length > 0 ? affiliateProducts[mobileIndex] : null;
 
   const renderSideCard = (product: any) => {
     if (!product) return null;
@@ -172,205 +176,218 @@ export default function Register() {
 
   return (
     <main style={{ padding: "30px 15px", backgroundColor: "#F8FAFC", minHeight: "100vh", fontFamily: "sans-serif" }}>
-      <div style={{ display: "flex", justifyContent: "center", alignItems: "flex-start", gap: "25px", maxWidth: "1250px", margin: "0 auto" }}>
+      <div style={{ display: "flex", justifyContent: "center", alignItems: "flex-start", gap: "25px", maxWidth: "1250px", margin: "0 auto", flexDirection: "column" }}>
         
-        {/* 📢 Banner Lateral Esquerdo (Sticky) */}
-        <aside style={{ display: "none", flexDirection: "column", width: "260px", position: "sticky", top: "20px" }} className="side-banner-left">
-          {renderSideCard(leftProduct)}
-        </aside>
+        <div style={{ display: "flex", justifyContent: "center", alignItems: "flex-start", gap: "25px", width: "100%" }}>
+          {/* 📢 Banner Lateral Esquerdo (Sticky apenas no Desktop) */}
+          <aside style={{ display: "none", flexDirection: "column", width: "260px", position: "sticky", top: "20px" }} className="side-banner-left">
+            {renderSideCard(leftProduct)}
+          </aside>
 
-        {/* 📝 Formulário Central de Cadastro */}
-        <div style={{ flex: "1", maxWidth: "460px", background: "#ffffff", padding: "40px", borderRadius: "12px", boxShadow: "0 4px 20px rgba(0,0,0,0.08)", border: "1px solid #eaeaea" }}>
-          
-          {/* Título Principal */}
-          <h1 style={{ fontSize: "22px", fontWeight: "bold", textAlign: "center", color: "#0A2540", marginBottom: "24px" }}>
-            Criar Nova Conta
-          </h1>
+          {/* 📝 Formulário Central de Cadastro */}
+          <div style={{ flex: "1", maxWidth: "460px", width: "100%", background: "#ffffff", padding: "40px", borderRadius: "12px", boxShadow: "0 4px 20px rgba(0,0,0,0.08)", border: "1px solid #eaeaea", boxSizing: "border-box", margin: "0 auto" }}>
+            
+            {/* Título Principal */}
+            <h1 style={{ fontSize: "22px", fontWeight: "bold", textAlign: "center", color: "#0A2540", marginBottom: "24px" }}>
+              Criar Nova Conta
+            </h1>
 
-          {/* Chave Seletora de Abas Simplificada */}
-          <div style={{ display: "flex", gap: "10px", marginBottom: "24px", background: "#f8f9fa", padding: "4px", borderRadius: "8px", border: "1px solid #e2e8f0" }}>
-            <button
-              type="button"
-              onClick={() => setTab("advertiser")}
-              style={{
-                flex: 1,
-                padding: "10px",
-                borderRadius: "6px",
-                border: "none",
-                background: tab === "advertiser" ? "#ffffff" : "transparent",
-                color: tab === "advertiser" ? "#0A2540" : "#64748b",
-                fontWeight: tab === "advertiser" ? "bold" : "normal",
-                boxShadow: tab === "advertiser" ? "0 2px 4px rgba(0,0,0,0.05)" : "none",
-                cursor: "pointer",
-                transition: "all 0.2s ease"
-              }}
-            >
-              📱 Anunciante
-            </button>
-
-            <button
-              type="button"
-              onClick={() => setTab("store")}
-              style={{
-                flex: 1,
-                padding: "10px",
-                borderRadius: "6px",
-                border: "none",
-                background: tab === "store" ? "#ffffff" : "transparent",
-                color: tab === "store" ? "#0A2540" : "#64748b",
-                fontWeight: tab === "store" ? "bold" : "normal",
-                boxShadow: tab === "store" ? "0 2px 4px rgba(0,0,0,0.05)" : "none",
-                cursor: "pointer",
-                transition: "all 0.2s ease"
-              }}
-            >
-              🏢 Cadastrar Loja
-            </button>
-          </div>
-
-          {/* Formulário Condicional */}
-          {tab === "advertiser" ? (
-            /* Formulário de Anunciante (Celular e Senha) */
-            <form onSubmit={handleAdvertiserRegister} style={{ display: "flex", flexDirection: "column", gap: "14px" }}>
-              <div>
-                <label style={{ display: "block", fontSize: "13px", fontWeight: "600", color: "#334155", marginBottom: "6px" }}>
-                  Número do Celular (com DDD)
-                </label>
-                <input 
-                  style={{ width: "100%", padding: "11px 14px", border: "1px solid #cbd5e1", borderRadius: "8px", color: "#000", fontSize: "14px", outline: "none" }} 
-                  placeholder="Ex: 18912345678" 
-                  required 
-                  onChange={(e) => setAdvertiserForm({ ...advertiserForm, phone: e.target.value })} 
-                />
-              </div>
-
-              <div>
-                <label style={{ display: "block", fontSize: "13px", fontWeight: "600", color: "#334155", marginBottom: "6px" }}>
-                  Senha
-                </label>
-                <input 
-                  style={{ width: "100%", padding: "11px 14px", border: "1px solid #cbd5e1", borderRadius: "8px", color: "#000", fontSize: "14px", outline: "none" }} 
-                  type="password" 
-                  placeholder="Sua senha de acesso" 
-                  required 
-                  onChange={(e) => setAdvertiserForm({ ...advertiserForm, password: e.target.value })} 
-                />
-              </div>
-
-              <button 
-                type="submit" 
-                disabled={loading} 
-                style={{ 
-                  marginTop: "8px",
-                  padding: "12px", 
-                  backgroundColor: "#0A2540", 
-                  color: "white", 
-                  border: "none", 
-                  borderRadius: "8px", 
-                  cursor: "pointer", 
-                  fontWeight: "bold",
-                  fontSize: "15px",
-                  transition: "background 0.2s"
+            {/* Chave Seletora de Abas Simplificada */}
+            <div style={{ display: "flex", gap: "10px", marginBottom: "24px", background: "#f8f9fa", padding: "4px", borderRadius: "8px", border: "1px solid #e2e8f0" }}>
+              <button
+                type="button"
+                onClick={() => setTab("advertiser")}
+                style={{
+                  flex: 1,
+                  padding: "10px",
+                  borderRadius: "6px",
+                  border: "none",
+                  background: tab === "advertiser" ? "#ffffff" : "transparent",
+                  color: tab === "advertiser" ? "#0A2540" : "#64748b",
+                  fontWeight: tab === "advertiser" ? "bold" : "normal",
+                  boxShadow: tab === "advertiser" ? "0 2px 4px rgba(0,0,0,0.05)" : "none",
+                  cursor: "pointer",
+                  transition: "all 0.2s ease"
                 }}
               >
-                {loading ? "Cadastrando..." : "Cadastrar Conta"}
+                📱 Anunciante
               </button>
-            </form>
-          ) : (
-            /* Formulário de Loja */
-            <form onSubmit={handleStoreRegister} style={{ display: "flex", flexDirection: "column", gap: "14px" }}>
-              <div>
-                <label style={{ display: "block", fontSize: "13px", fontWeight: "600", color: "#334155", marginBottom: "6px" }}>
-                  Nome da Loja ou Responsável
-                </label>
-                <input 
-                  style={{ width: "100%", padding: "11px 14px", border: "1px solid #cbd5e1", borderRadius: "8px", color: "#000", fontSize: "14px", outline: "none" }} 
-                  placeholder="Ex: Minha Loja" 
-                  required 
-                  onChange={(e) => setStoreForm({ ...storeForm, name: e.target.value })} 
-                />
-              </div>
 
-              <div>
-                <label style={{ display: "block", fontSize: "13px", fontWeight: "600", color: "#334155", marginBottom: "6px" }}>
-                  E-mail de Acesso
-                </label>
-                <input 
-                  style={{ width: "100%", padding: "11px 14px", border: "1px solid #cbd5e1", borderRadius: "8px", color: "#000", fontSize: "14px", outline: "none" }} 
-                  type="email" 
-                  placeholder="seu@email.com" 
-                  required 
-                  onChange={(e) => setStoreForm({ ...storeForm, email: e.target.value })} 
-                />
-              </div>
-
-              <div>
-                <label style={{ display: "block", fontSize: "13px", fontWeight: "600", color: "#334155", marginBottom: "6px" }}>
-                  Senha
-                </label>
-                <input 
-                  style={{ width: "100%", padding: "11px 14px", border: "1px solid #cbd5e1", borderRadius: "8px", color: "#000", fontSize: "14px", outline: "none" }} 
-                  type="password" 
-                  placeholder="Sua senha (mínimo 6 caracteres)" 
-                  required 
-                  onChange={(e) => setStoreForm({ ...storeForm, password: e.target.value })} 
-                />
-              </div>
-
-              <div>
-                <label style={{ display: "block", fontSize: "13px", fontWeight: "600", color: "#334155", marginBottom: "6px" }}>
-                  WhatsApp para Contato
-                </label>
-                <input 
-                  style={{ width: "100%", padding: "11px 14px", border: "1px solid #cbd5e1", borderRadius: "8px", color: "#000", fontSize: "14px", outline: "none" }} 
-                  placeholder="Ex: 18912345678" 
-                  required 
-                  onChange={(e) => setStoreForm({ ...storeForm, whatsapp: e.target.value })} 
-                />
-              </div>
-
-              <button 
-                type="submit" 
-                disabled={loading} 
-                style={{ 
-                  marginTop: "8px",
-                  padding: "12px", 
-                  backgroundColor: "#0A2540", 
-                  color: "white", 
-                  border: "none", 
-                  borderRadius: "8px", 
-                  cursor: "pointer", 
-                  fontWeight: "bold",
-                  fontSize: "15px",
-                  transition: "background 0.2s"
+              <button
+                type="button"
+                onClick={() => setTab("store")}
+                style={{
+                  flex: 1,
+                  padding: "10px",
+                  borderRadius: "6px",
+                  border: "none",
+                  background: tab === "store" ? "#ffffff" : "transparent",
+                  color: tab === "store" ? "#0A2540" : "#64748b",
+                  fontWeight: tab === "store" ? "bold" : "normal",
+                  boxShadow: tab === "store" ? "0 2px 4px rgba(0,0,0,0.05)" : "none",
+                  cursor: "pointer",
+                  transition: "all 0.2s ease"
                 }}
               >
-                {loading ? "Criando conta..." : "Cadastrar Conta"}
+                🏢 Cadastrar Loja
               </button>
-            </form>
-          )}
+            </div>
 
-          {/* Rodapé do Card com Link para Login */}
-          <div style={{ textAlign: "center", marginTop: "20px" }}>
-            <a href="/login" style={{ color: "#0070f3", fontSize: "14px", textDecoration: "none" }}>
-              Já tem uma conta? Faça login
-            </a>
+            {/* Formulário Condicional */}
+            {tab === "advertiser" ? (
+              /* Formulário de Anunciante (Celular e Senha) */
+              <form onSubmit={handleAdvertiserRegister} style={{ display: "flex", flexDirection: "column", gap: "14px" }}>
+                <div>
+                  <label style={{ display: "block", fontSize: "13px", fontWeight: "600", color: "#334155", marginBottom: "6px" }}>
+                    Número do Celular (com DDD)
+                  </label>
+                  <input 
+                    style={{ width: "100%", padding: "11px 14px", border: "1px solid #cbd5e1", borderRadius: "8px", color: "#000", fontSize: "14px", outline: "none", boxSizing: "border-box" }} 
+                    placeholder="Ex: 18912345678" 
+                    required 
+                    onChange={(e) => setAdvertiserForm({ ...advertiserForm, phone: e.target.value })} 
+                  />
+                </div>
+
+                <div>
+                  <label style={{ display: "block", fontSize: "13px", fontWeight: "600", color: "#334155", marginBottom: "6px" }}>
+                    Senha
+                  </label>
+                  <input 
+                    style={{ width: "100%", padding: "11px 14px", border: "1px solid #cbd5e1", borderRadius: "8px", color: "#000", fontSize: "14px", outline: "none", boxSizing: "border-box" }} 
+                    type="password" 
+                    placeholder="Sua senha de acesso" 
+                    required 
+                    onChange={(e) => setAdvertiserForm({ ...advertiserForm, password: e.target.value })} 
+                  />
+                </div>
+
+                <button 
+                  type="submit" 
+                  disabled={loading} 
+                  style={{ 
+                    marginTop: "8px",
+                    padding: "12px", 
+                    backgroundColor: "#0A2540", 
+                    color: "white", 
+                    border: "none", 
+                    borderRadius: "8px", 
+                    cursor: "pointer", 
+                    fontWeight: "bold",
+                    fontSize: "15px",
+                    transition: "background 0.2s"
+                  }}
+                >
+                  {loading ? "Cadastrando..." : "Cadastrar Conta"}
+                </button>
+              </form>
+            ) : (
+              /* Formulário de Loja */
+              <form onSubmit={handleStoreRegister} style={{ display: "flex", flexDirection: "column", gap: "14px" }}>
+                <div>
+                  <label style={{ display: "block", fontSize: "13px", fontWeight: "600", color: "#334155", marginBottom: "6px" }}>
+                    Nome da Loja ou Responsável
+                  </label>
+                  <input 
+                    style={{ width: "100%", padding: "11px 14px", border: "1px solid #cbd5e1", borderRadius: "8px", color: "#000", fontSize: "14px", outline: "none", boxSizing: "border-box" }} 
+                    placeholder="Ex: Minha Loja" 
+                    required 
+                    onChange={(e) => setStoreForm({ ...storeForm, name: e.target.value })} 
+                  />
+                </div>
+
+                <div>
+                  <label style={{ display: "block", fontSize: "13px", fontWeight: "600", color: "#334155", marginBottom: "6px" }}>
+                    E-mail de Acesso
+                  </label>
+                  <input 
+                    style={{ width: "100%", padding: "11px 14px", border: "1px solid #cbd5e1", borderRadius: "8px", color: "#000", fontSize: "14px", outline: "none", boxSizing: "border-box" }} 
+                    type="email" 
+                    placeholder="seu@email.com" 
+                    required 
+                    onChange={(e) => setStoreForm({ ...storeForm, email: e.target.value })} 
+                  />
+                </div>
+
+                <div>
+                  <label style={{ display: "block", fontSize: "13px", fontWeight: "600", color: "#334155", marginBottom: "6px" }}>
+                    Senha
+                  </label>
+                  <input 
+                    style={{ width: "100%", padding: "11px 14px", border: "1px solid #cbd5e1", borderRadius: "8px", color: "#000", fontSize: "14px", outline: "none", boxSizing: "border-box" }} 
+                    type="password" 
+                    placeholder="Sua senha (mínimo 6 caracteres)" 
+                    required 
+                    onChange={(e) => setStoreForm({ ...storeForm, password: e.target.value })} 
+                  />
+                </div>
+
+                <div>
+                  <label style={{ display: "block", fontSize: "13px", fontWeight: "600", color: "#334155", marginBottom: "6px" }}>
+                    WhatsApp para Contato
+                  </label>
+                  <input 
+                    style={{ width: "100%", padding: "11px 14px", border: "1px solid #cbd5e1", borderRadius: "8px", color: "#000", fontSize: "14px", outline: "none", boxSizing: "border-box" }} 
+                    placeholder="Ex: 18912345678" 
+                    required 
+                    onChange={(e) => setStoreForm({ ...storeForm, whatsapp: e.target.value })} 
+                  />
+                </div>
+
+                <button 
+                  type="submit" 
+                  disabled={loading} 
+                  style={{ 
+                    marginTop: "8px",
+                    padding: "12px", 
+                    backgroundColor: "#0A2540", 
+                    color: "white", 
+                    border: "none", 
+                    borderRadius: "8px", 
+                    cursor: "pointer", 
+                    fontWeight: "bold",
+                    fontSize: "15px",
+                    transition: "background 0.2s"
+                  }}
+                >
+                  {loading ? "Criando conta..." : "Cadastrar Conta"}
+                </button>
+              </form>
+            )}
+
+            {/* Rodapé do Card com Link para Login */}
+            <div style={{ textAlign: "center", marginTop: "20px" }}>
+              <a href="/login" style={{ color: "#0070f3", fontSize: "14px", textDecoration: "none" }}>
+                Já tem uma conta? Faça login
+              </a>
+            </div>
+
           </div>
 
+          {/* 📢 Banner Lateral Direito (Sticky apenas no Desktop) */}
+          <aside style={{ display: "none", flexDirection: "column", width: "260px", position: "sticky", top: "20px" }} className="side-banner-right">
+            {renderSideCard(rightProduct)}
+          </aside>
         </div>
 
-        {/* 📢 Banner Lateral Direito (Sticky) */}
-        <aside style={{ display: "none", flexDirection: "column", width: "260px", position: "sticky", top: "20px" }} className="side-banner-right">
-          {renderSideCard(rightProduct)}
-        </aside>
+        {/* 📱 Banner exclusivo para Celular (Aparece abaixo do formulário em telas pequenas) */}
+        <div style={{ width: "100%", maxWidth: "460px", margin: "20px auto 0 auto" }} className="mobile-banner-container">
+          {renderSideCard(mobileProduct)}
+        </div>
 
       </div>
 
-      {/* Regra CSS para exibir as laterais apenas em desktops */}
+      {/* Regras CSS Responsivas: Exibe laterais no Desktop e oculta o banner extra mobile; Inverte no Celular */}
       <style jsx global>{`
+        .mobile-banner-container {
+          display: block;
+        }
         @media (min-width: 1024px) {
           .side-banner-left, .side-banner-right {
             display: flex !important;
+          }
+          .mobile-banner-container {
+            display: none !important;
           }
         }
       `}</style>
