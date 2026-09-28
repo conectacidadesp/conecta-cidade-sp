@@ -11,7 +11,8 @@ export default function RootLayout({
 }: {
   children: React.ReactNode;
 }) {
-  const faviconUrl = "https://ahiyxrdplhecskzoiogd.supabase.co/storage/v1/object/public/site-assets/Logo%20redonda.png?v=3";
+  // 🔹 Favicon atualizado com ?v=4 para forçar o navegador a atualizar e evitar conflito
+  const faviconUrl = "https://ahiyxrdplhecskzoiogd.supabase.co/storage/v1/object/public/site-assets/Logo%20redonda.png?v=4";
 
   return (
     <html lang="pt-BR">
