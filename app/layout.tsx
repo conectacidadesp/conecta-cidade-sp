@@ -1,4 +1,5 @@
 import Header from "@/components/Header";
+import Script from "next/script";
 
 export const metadata = {
   title: "Conecta Cidade SP",
@@ -18,6 +19,24 @@ export default function RootLayout({
         <link rel="icon" href={faviconUrl} />
         <link rel="shortcut icon" href={faviconUrl} />
         <link rel="apple-touch-icon" href={faviconUrl} />
+
+        {/* 📊 Google Analytics (GA4) */}
+        <Script
+          strategy="afterInteractive"
+          src="https://www.googletagmanager.com/gtag/js?id=G-YZ0Z2H8YRB"
+        />
+        <Script
+          id="google-analytics"
+          strategy="afterInteractive"
+          dangerouslySetInnerHTML={{
+            __html: `
+              window.dataLayer = window.dataLayer || [];
+              function gtag(){dataLayer.push(arguments);}
+              gtag('js', new Date());
+              gtag('config', 'G-YZ0Z2H8YRB');
+            `,
+          }}
+        />
       </head>
       <body style={{ fontFamily: "sans-serif", margin: 0, padding: 0, backgroundColor: "#F8FAFC", minHeight: "100vh", display: "flex", flexDirection: "column" }}>
         
