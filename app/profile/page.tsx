@@ -13,6 +13,9 @@ interface Ad {
   description?: string;
   is_hidden?: boolean;
   is_featured?: boolean;
+  created_at?: string;
+  show_in_classificados?: boolean;
+  user_id?: string;
 }
 
 const FONT_OPTIONS = [
@@ -69,6 +72,7 @@ export default function ProfileDashboard() {
   const [loading, setLoading] = useState(false);
   const [fetching, setFetching] = useState(true);
   const [user, setUser] = useState<any>(null);
+  const [debugInfo, setDebugInfo] = useState<string>("");
 
   const availableCities = ["Rubiácea-SP", "Guararapes-SP"];
 
@@ -83,6 +87,7 @@ export default function ProfileDashboard() {
       }
       
       setUser(user);
+      console.log("Usuário logado ID:", user.id);
 
       const { data: profileData } = await supabase
         .from("profiles")
@@ -128,12 +133,24 @@ export default function ProfileDashboard() {
       }
 
       setLoadingAds(true);
-      const { data: adsData } = await supabase
-        .from("ads")
-        .select("id, title, price, category, image_url, city, description, is_hidden")
-        .eq("user_id", user.id);
 
-      if (adsData) {
+      // 🔹 BUSCA ROBUSTA: Tenta buscar por user_id e também exibe logs de depuração
+      console.log("Buscando anúncios para user_id:", user.id);
+      const { data: adsData, error: adsError } = await supabase
+        .from("ads")
+        .select("*")
+        .eq("user_id", user.id)
+        .order("created_at", { ascending: false });
+
+      if (adsError) {
+        console.error("Erro ao buscar ads:", adsError);
+        setDebugInfo("Erro Supabase: " + adsError.message);
+      } else {
+        console.log("Anúncios encontrados para este usuário:", adsData);
+        setDebugInfo(`Encontrados ${adsData?.length || 0} anúncios para o ID ${user.id}`);
+      }
+
+      if (adsData && adsData.length > 0) {
         const { data: storiesData } = await supabase
           .from("stories")
           .select("ad_id")
@@ -147,6 +164,8 @@ export default function ProfileDashboard() {
         }));
 
         setMyAds(formattedAds);
+      } else {
+        setMyAds([]);
       }
       
       setLoadingAds(false);
@@ -247,7 +266,6 @@ export default function ProfileDashboard() {
     }
   };
 
-  // 🔄 Botão Vendido com try/catch totalmente blindado
   const handleMarkAsSold = async (adId: string, adTitle: string) => {
     if (!window.confirm(`Marcar "${adTitle}" como vendido? O anúncio será encerrado e removido do seu painel.`)) return;
 
@@ -255,9 +273,7 @@ export default function ProfileDashboard() {
       await supabase.from("sales_stats").insert([
         { user_id: user.id, ad_id: adId, title: adTitle, sold_at: new Date().toISOString() }
       ]);
-    } catch (e) {
-      // Ignora se a tabela de estatísticas não estiver criada ainda
-    }
+    } catch (e) {}
 
     const { error } = await supabase.from("ads").delete().eq("id", adId);
 
@@ -269,7 +285,36 @@ export default function ProfileDashboard() {
     }
   };
 
-  // ⚡ Destacar Anúncio por 24h
+  const handleToggleClassificados = async (adId: string, currentState: boolean) => {
+    const newState = !currentState;
+    const updatePayload: any = { show_in_classificados: newState };
+    
+    if (newState) {
+      updatePayload.created_at = new Date().toISOString();
+    }
+
+    const { error } = await supabase.from("ads").update(updatePayload).eq("id", adId);
+
+    if (!error) {
+      setMyAds(myAds.map(a => a.id === adId ? { ...a, show_in_classificados: newState, created_at: newState ? new Date().toISOString() : a.created_at } : a));
+      alert(newState ? "Produto anunciado nos classificados com sucesso!" : "Produto retirado dos classificados (continua visível na sua vitrine).");
+    } else {
+      alert("Erro ao atualizar status: " + error.message);
+    }
+  };
+
+  const handleRenewAd = async (adId: string) => {
+    const newDate = new Date().toISOString();
+    const { error } = await supabase.from("ads").update({ created_at: newDate, show_in_classificados: true }).eq("id", adId);
+
+    if (!error) {
+      setMyAds(myAds.map(a => a.id === adId ? { ...a, created_at: newDate, show_in_classificados: true } : a));
+      alert("Anúncio renovado com sucesso e enviado para o topo da home!");
+    } else {
+      alert("Erro ao renovar anúncio: " + error.message);
+    }
+  };
+
   const handleToggleFeature = async (adId: string, currentFeatured: boolean, adImageUrl?: string | null) => {
     if (currentFeatured) {
       const { error } = await supabase.from("stories").delete().eq("ad_id", adId);
@@ -296,18 +341,6 @@ export default function ProfileDashboard() {
     }
   };
 
-  // 👁️ Ocultar / Exibir Anúncio
-  const handleToggleHide = async (adId: string, currentHidden: boolean) => {
-    const newStatus = !currentHidden;
-    const { error } = await supabase.from("ads").update({ is_hidden: newStatus }).eq("id", adId);
-
-    if (!error) {
-      setMyAds(myAds.map(a => a.id === adId ? { ...a, is_hidden: newStatus } : a));
-    } else {
-      alert("Erro ao alterar visibilidade: " + error.message);
-    }
-  };
-
   const activeThemeHex = THEME_OPTIONS.find(t => t.id === themeColor)?.color || "#0F4C81";
   const activeFontFamily = FONT_OPTIONS.find(f => f.id === fontStyle)?.family || "system-ui, -apple-system, sans-serif";
 
@@ -327,7 +360,7 @@ export default function ProfileDashboard() {
         </button>
 
         {userType === "store" && storeName && (
-          <button
+          <button 
             onClick={() => window.open(`/shop/${user?.id}`, "_blank")}
             style={{ padding: "8px 14px", backgroundColor: activeThemeHex, color: "#fff", border: "none", borderRadius: 6, fontWeight: "bold", cursor: "pointer", fontSize: 13 }}
           >
@@ -376,7 +409,7 @@ export default function ProfileDashboard() {
                 borderBottom: activeTab === "anuncios" ? `3px solid ${activeThemeHex}` : "none"
               }}
             >
-              📦 Meus Anúncios ({myAds.length})
+              📦 Meus Produtos / Anúncios ({myAds.length})
             </button>
           </div>
         ) : null}
@@ -566,11 +599,22 @@ export default function ProfileDashboard() {
             <div>
               <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 20 }}>
                 <div>
-                  <h2 style={{ fontSize: 20, margin: 0, fontWeight: "bold", color: "#1E293B" }}>Meus Anúncios</h2>
-                  <p style={{ color: "#64748B", margin: "4px 0 0 0", fontSize: 13 }}>Gerencie as publicações exibidas no site.</p>
+                  <h2 style={{ fontSize: 20, margin: 0, fontWeight: "bold", color: "#1E293B" }}>
+                    {userType === "store" ? "Gerenciar Produtos da Loja" : "Meus Anúncios"}
+                  </h2>
+                  <p style={{ color: "#64748B", margin: "4px 0 0 0", fontSize: 13 }}>
+                    {userType === "store" 
+                      ? "Cadastre produtos na sua vitrine e escolha quais aparecem nos classificados gerais (Validade de 10 dias na home)." 
+                      : "Gerencie seus anúncios publicados no site."}
+                  </p>
+                  {debugInfo && (
+                    <p style={{ color: "#D97706", fontSize: 12, marginTop: 6, fontWeight: "bold" }}>
+                      🔍 [Debug]: {debugInfo}
+                    </p>
+                  )}
                 </div>
                 <button onClick={() => window.location.href = "/create"} style={{ padding: "10px 14px", backgroundColor: activeThemeHex, color: "#fff", border: "none", borderRadius: 6, fontWeight: "bold", cursor: "pointer", fontSize: 13 }}>
-                  + Novo Anúncio
+                  {userType === "store" ? "+ Adicionar Produto" : "+ Novo Anúncio"}
                 </button>
               </div>
 
@@ -578,74 +622,114 @@ export default function ProfileDashboard() {
                 <p style={{ fontSize: 14, color: "#64748B", textAlign: "center" }}>Buscando produtos...</p>
               ) : myAds.length === 0 ? (
                 <div style={{ textAlign: "center", padding: "40px 10px", border: "2px dashed #CBD5E1", borderRadius: 8 }}>
-                  <p style={{ color: "#64748B", fontSize: 14, margin: "0 0 15px 0" }}>Você não possui nenhum anúncio ativo.</p>
+                  <p style={{ color: "#64748B", fontSize: 14, margin: "0 0 15px 0" }}>Você não possui nenhum produto cadastrado para este ID de usuário.</p>
                   <button onClick={() => window.location.href = "/create"} style={{ padding: "10px 15px", backgroundColor: activeThemeHex, color: "#fff", border: "none", borderRadius: 6, fontWeight: "bold", cursor: "pointer", fontSize: 13 }}>
-                    Criar Anúncio Agora
+                    {userType === "store" ? "Adicionar Primeiro Produto" : "Criar Anúncio Agora"}
                   </button>
                 </div>
               ) : (
                 <div style={{ display: "flex", flexDirection: "column", gap: 12 }}>
-                  {myAds.map((ad) => (
-                    <div key={ad.id} style={{ display: "flex", gap: 15, padding: 12, border: "1px solid #E2E8F0", borderRadius: 8, alignItems: "center", justifyContent: "space-between", flexWrap: "wrap", opacity: ad.is_hidden ? 0.6 : 1, backgroundColor: ad.is_hidden ? "#F8FAFC" : "#fff" }}>
-                      <div style={{ display: "flex", gap: 12, alignItems: "center", flex: 1, minWidth: 200 }}>
-                        {ad.image_url ? (
-                          <img src={ad.image_url} alt={ad.title} style={{ width: 55, height: 55, borderRadius: 6, objectFit: "cover" }} />
-                        ) : (
-                          <div style={{ width: 55, height: 55, borderRadius: 6, backgroundColor: "#F1F5F9", display: "flex", alignItems: "center", justifyContent: "center", fontSize: 10, color: "#94A3B8" }}>Sem foto</div>
-                        )}
-                        <div style={{ minWidth: 0 }}>
-                          <h4 style={{ margin: 0, fontSize: 14, fontWeight: "bold", color: "#1E293B", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
-                            {ad.title}
-                          </h4>
-                          <p style={{ margin: "3px 0 0 0", fontSize: 13, color: activeThemeHex, fontWeight: "bold" }}>
-                            {ad.price ? `R$ ${ad.price.toFixed(2)}` : "Valor a combinar"}
-                          </p>
-                          <span style={{ fontSize: 11, color: "#94A3B8" }}>» {ad.city} • {ad.category}</span>
+                  {myAds.map((ad) => {
+                    const createdTime = ad.created_at ? new Date(ad.created_at).getTime() : Date.now();
+                    const diffDays = (Date.now() - createdTime) / (1000 * 60 * 60 * 24);
+                    const isExpired = diffDays > 10;
+                    const isClassificadosActive = ad.show_in_classificados === true;
+
+                    return (
+                      <div key={ad.id} style={{ display: "flex", gap: 15, padding: 12, border: "1px solid #E2E8F0", borderRadius: 8, alignItems: "center", justifyContent: "space-between", flexWrap: "wrap", opacity: ad.is_hidden ? 0.6 : 1, backgroundColor: ad.is_hidden ? "#F8FAFC" : "#fff" }}>
+                        <div style={{ display: "flex", gap: 12, alignItems: "center", flex: 1, minWidth: 200 }}>
+                          {ad.image_url ? (
+                            <img src={ad.image_url} alt={ad.title} style={{ width: 55, height: 55, borderRadius: 6, objectFit: "cover" }} />
+                          ) : (
+                            <div style={{ width: 55, height: 55, borderRadius: 6, backgroundColor: "#F1F5F9", display: "flex", alignItems: "center", justifyContent: "center", fontSize: 10, color: "#94A3B8" }}>Sem foto</div>
+                          )}
+                          <div style={{ minWidth: 0 }}>
+                            <h4 style={{ margin: 0, fontSize: 14, fontWeight: "bold", color: "#1E293B", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
+                              {ad.title}
+                            </h4>
+                            <p style={{ margin: "3px 0 0 0", fontSize: 13, color: activeThemeHex, fontWeight: "bold" }}>
+                              {ad.price ? `R$ ${ad.price.toFixed(2)}` : "Valor a combinar"}
+                            </p>
+                            <span style={{ fontSize: 11, color: "#94A3B8" }}>
+                              » {ad.city} • {ad.category} {isExpired && isClassificadosActive && <span style={{ color: "#DC2626", fontWeight: "bold" }}>• Expirado da Home</span>}
+                            </span>
+                          </div>
+                        </div>
+
+                        <div style={{ display: "flex", gap: 6, flexShrink: 0, marginTop: 8, flexWrap: "wrap" }}>
+                          {userType === "store" ? (
+                            <>
+                              {isExpired && isClassificadosActive ? (
+                                <button 
+                                  onClick={() => handleRenewAd(ad.id)}
+                                  style={{ padding: "8px 12px", backgroundColor: "#D97706", color: "#fff", border: "none", borderRadius: 6, fontSize: 12, fontWeight: "bold", cursor: "pointer" }}
+                                >
+                                  ⚠️ Expirado, Anunciar Novamente
+                                </button>
+                              ) : isClassificadosActive ? (
+                                <button 
+                                  onClick={() => handleToggleClassificados(ad.id, true)}
+                                  style={{ padding: "8px 12px", backgroundColor: "#16A34A", color: "#fff", border: "none", borderRadius: 6, fontSize: 12, fontWeight: "bold", cursor: "pointer" }}
+                                >
+                                  ✓ Produto Anunciado nos Classificados
+                                </button>
+                              ) : (
+                                <button 
+                                  onClick={() => handleToggleClassificados(ad.id, false)}
+                                  style={{ padding: "8px 12px", backgroundColor: "#0284C7", color: "#fff", border: "none", borderRadius: 6, fontSize: 12, fontWeight: "bold", cursor: "pointer" }}
+                                >
+                                  📢 Anunciar nos Classificados
+                                </button>
+                              )}
+
+                              <button 
+                                onClick={() => handleToggleFeature(ad.id, !!ad.is_featured, ad.image_url)}
+                                style={{ padding: "8px 10px", backgroundColor: ad.is_featured ? "#FEF3C7" : "#10B981", color: ad.is_featured ? "#D97706" : "#fff", border: "none", borderRadius: 6, fontSize: 12, fontWeight: "bold", cursor: "pointer" }}
+                              >
+                                {ad.is_featured ? "⭐ Destacado" : "⚡ Destacar 24h"}
+                              </button>
+                            </>
+                          ) : (
+                            <>
+                              {isExpired ? (
+                                <button 
+                                  onClick={() => handleRenewAd(ad.id)}
+                                  style={{ padding: "8px 12px", backgroundColor: "#0284C7", color: "#fff", border: "none", borderRadius: 6, fontSize: 12, fontWeight: "bold", cursor: "pointer" }}
+                                >
+                                  🔄 Expirado, Anunciar Novamente
+                                </button>
+                              ) : (
+                                <span style={{ padding: "8px 12px", backgroundColor: "#D1FAE5", color: "#065F46", borderRadius: 6, fontSize: 12, fontWeight: "bold" }}>
+                                  Anunciado nos Classificados
+                                </span>
+                              )}
+
+                              <button 
+                                onClick={() => handleMarkAsSold(ad.id, ad.title)}
+                                style={{ padding: "8px 12px", backgroundColor: "#DC2626", color: "#fff", border: "none", borderRadius: 6, fontSize: 12, fontWeight: "bold", cursor: "pointer" }}
+                              >
+                                ✅ Vendido
+                              </button>
+                            </>
+                          )}
+
+                          <button 
+                            onClick={() => window.location.href = `/edit-ad/${ad.id}`}
+                            style={{ padding: "8px 12px", backgroundColor: "#E2E8F0", color: "#1E293B", border: "none", borderRadius: 6, fontSize: 12, fontWeight: "bold", cursor: "pointer" }}
+                          >
+                            Editar
+                          </button>
+
+                          <button 
+                            onClick={() => handleDeleteAd(ad.id, ad.title)}
+                            style={{ padding: "8px 12px", backgroundColor: "#FEE2E2", color: "#DC2626", border: "none", borderRadius: 6, fontSize: 12, fontWeight: "bold", cursor: "pointer" }}
+                          >
+                            Excluir
+                          </button>
                         </div>
                       </div>
-
-                      <div style={{ display: "flex", gap: 6, flexShrink: 0, marginTop: 8, flexWrap: "wrap" }}>
-                        {userType === "store" ? (
-                          <>
-                            <button 
-                              onClick={() => handleToggleFeature(ad.id, !!ad.is_featured, ad.image_url)}
-                              style={{ padding: "8px 10px", backgroundColor: ad.is_featured ? "#FEF3C7" : "#10B981", color: ad.is_featured ? "#D97706" : "#fff", border: "none", borderRadius: 6, fontSize: 12, fontWeight: "bold", cursor: "pointer" }}
-                            >
-                              {ad.is_featured ? "⭐ Destacado" : "⚡ Destacar 24h"}
-                            </button>
-
-                            <button 
-                              onClick={() => handleToggleHide(ad.id, !!ad.is_hidden)}
-                              style={{ padding: "8px 10px", backgroundColor: "#FEF9C3", color: "#854D0E", border: "none", borderRadius: 6, fontSize: 12, fontWeight: "bold", cursor: "pointer" }}
-                            >
-                              {ad.is_hidden ? "Exibir" : "Ocultar"}
-                            </button>
-                          </>
-                        ) : (
-                          <button 
-                            onClick={() => handleMarkAsSold(ad.id, ad.title)}
-                            style={{ padding: "8px 12px", backgroundColor: "#DC2626", color: "#fff", border: "none", borderRadius: 6, fontSize: 12, fontWeight: "bold", cursor: "pointer" }}
-                          >
-                            ✅ Vendido
-                          </button>
-                        )}
-
-                        <button 
-                          onClick={() => window.location.href = `/edit-ad/${ad.id}`}
-                          style={{ padding: "8px 12px", backgroundColor: "#E2E8F0", color: "#1E293B", border: "none", borderRadius: 6, fontSize: 12, fontWeight: "bold", cursor: "pointer" }}
-                        >
-                          Editar
-                        </button>
-
-                        <button 
-                          onClick={() => handleDeleteAd(ad.id, ad.title)}
-                          style={{ padding: "8px 12px", backgroundColor: "#FEE2E2", color: "#DC2626", border: "none", borderRadius: 6, fontSize: 12, fontWeight: "bold", cursor: "pointer" }}
-                        >
-                          Excluir
-                        </button>
-                      </div>
-                    </div>
-                  ))}
+                    );
+                  })}
                 </div>
               )}
             </div>

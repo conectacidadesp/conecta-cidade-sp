@@ -21,6 +21,15 @@ export default function RootLayout({
         <link rel="shortcut icon" href={faviconUrl} />
         <link rel="apple-touch-icon" href={faviconUrl} />
 
+        {/* 📢 Google AdSense */}
+        <meta name="google-adsense-account" content="ca-pub-3335848179325993" />
+        <Script
+          async
+          src="https://pagead2.googlesyndication.com/pagead/js/adsbygoogle.js?client=ca-pub-3335848179325993"
+          crossOrigin="anonymous"
+          strategy="afterInteractive"
+        />
+
         {/* 📊 Google Analytics (GA4) */}
         <Script
           strategy="afterInteractive"
@@ -71,8 +80,8 @@ export default function RootLayout({
             </div>
             <div>
               <h4 style={{ color: "#fff", margin: "0 0 12px" }}>📍 Cidades Atendidas</h4>
-              <p style={{ margin: "4px 0", fontSize: 13 }}>• Rubiácea-SP</p>
-              <p style={{ margin: "4px 0", fontSize: 13 }}>• Guararapes-SP</p>
+              <p style={{ margin: "4px 0", fontSize: 13 }}>Rubiácea-SP</p>
+              <p style={{ margin: "4px 0", fontSize: 13 }}>Guararapes-SP</p>
             </div>
           </div>
           <div style={{ borderTop: "1px solid #1E293B", textAlign: "center", paddingTop: 20, fontSize: 12 }}>

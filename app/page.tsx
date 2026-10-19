@@ -1,6 +1,7 @@
 "use client";
 
 import { useState, useEffect } from "react";
+import { useRouter } from "next/navigation";
 import { supabase } from "@/lib/supabase";
 import StoriesBar from "@/components/StoriesBar";
 import AffiliateRotativeCard from "@/components/AffiliateRotativeCard";
@@ -18,6 +19,7 @@ interface Ad {
   image_url: string | null;
   created_at: string;
   advertiser_name?: string | null;
+  show_in_classificados?: boolean;
 }
 
 interface Profile {
@@ -45,6 +47,8 @@ const CATEGORIES = [
 ];
 
 export default function Home() {
+  const router = useRouter();
+
   const [ads, setAds] = useState<Ad[]>([]);
   const [profiles, setProfiles] = useState<Profile[]>([]);
   const [profilesMap, setProfilesMap] = useState<{ [key: string]: Profile }>({});
@@ -59,26 +63,36 @@ export default function Home() {
   const [reportDetails, setReportDetails] = useState("");
   const [submittingReport, setSubmittingReport] = useState(false);
 
+  // 🔹 Redireciona para a tela de boas-vindas se o usuário não tiver escolhido a cidade
   useEffect(() => {
     if (typeof window !== "undefined") {
       const savedCity = localStorage.getItem("selectedCity");
-      if (savedCity) {
+      if (!savedCity) {
+        router.push("/welcome");
+      } else {
         setSelectedCity(savedCity);
       }
     }
-  }, []);
+  }, [router]);
 
   useEffect(() => {
     async function fetchData() {
       setLoading(true);
       
+      // 🔹 REGRA DE VALIDADE: Calcula a data de 10 dias atrás
+      const tenDaysAgo = new Date();
+      tenDaysAgo.setDate(tenDaysAgo.getDate() - 10);
+      const isoTenDaysAgo = tenDaysAgo.toISOString();
+
       const { data: adsData } = await supabase
         .from("ads")
         .select("*")
         .eq("city", selectedCity)
+        .gte("created_at", isoTenDaysAgo) // Filtra apenas anúncios dos últimos 10 dias
         .order("created_at", { ascending: false });
 
-      const loadedAds = adsData || [];
+      // 🔹 Filtra para garantir que apenas anúncios ativos nos classificados apareçam na home
+      const loadedAds = (adsData || []).filter(ad => ad.show_in_classificados !== false);
       setAds(loadedAds);
 
       const { data: profilesData } = await supabase
@@ -128,7 +142,55 @@ export default function Home() {
     return matchesCategory && matchesSearch;
   });
 
-  const relatedAds = ads.filter((ad) => !filteredAds.some((f) => f.id === ad.id));
+  // 🔹 EMBARALHAMENTO INTELIGENTE MELHORADO (Evita que o mesmo lojista monopolize o feed com múltiplos produtos seguidos)
+  const getBalancedFeed = (items: Ad[]) => {
+    if (activeSearch || (selectedCategory !== "Todos" && selectedCategory !== "Produtos")) {
+      return items;
+    }
+
+    const balanced: Ad[] = [];
+    const pool = [...items];
+    const recentStoresCount = new Map<string, number>();
+
+    while (pool.length > 0) {
+      let chosenIndex = -1;
+
+      // Tenta encontrar um item cuja loja ainda não apareceu recentemente
+      for (let i = 0; i < pool.length; i++) {
+        const ad = pool[i];
+        if (!ad.user_id) {
+          chosenIndex = i;
+          break;
+        }
+        const count = recentStoresCount.get(ad.user_id) || 0;
+        if (count < 1) {
+          chosenIndex = i;
+          break;
+        }
+      }
+
+      if (chosenIndex === -1) {
+        chosenIndex = 0;
+      }
+
+      const nextAd = pool.splice(chosenIndex, 1)[0];
+      balanced.push(nextAd);
+
+      recentStoresCount.clear();
+      const lastItems = balanced.slice(-2);
+      lastItems.forEach(item => {
+        if (item.user_id) {
+          recentStoresCount.set(item.user_id, (recentStoresCount.get(item.user_id) || 0) + 1);
+        }
+      });
+    }
+
+    return balanced;
+  };
+
+  const finalDisplayAds = getBalancedFeed(filteredAds);
+
+  const relatedAds = ads.filter((ad) => !finalDisplayAds.some((f) => f.id === ad.id));
 
   const filteredProfiles = profiles.filter(profile => {
     const sName = profile.store_name || profile.name || "";
@@ -496,12 +558,11 @@ export default function Home() {
               )
             ) : (
               <>
-                {filteredAds.length > 0 ? (
+                {finalDisplayAds.length > 0 ? (
                   <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(230px, 1fr))", gap: 20 }}>
-                    {filteredAds.map((ad, index) => {
+                    {finalDisplayAds.map((ad, index) => {
                       const elements = [renderAdCard(ad)];
 
-                      // 💡 REGRA DE OURO ATUALIZADA: A cada 4 anúncios de usuários, injetamos 1 card rotativo com índice sequencial cíclico
                       if ((index + 1) % 4 === 0) {
                         const affiliateSlotIndex = Math.floor(index / 4);
                         elements.push(
@@ -520,7 +581,7 @@ export default function Home() {
                   </div>
                 )}
 
-                {(filteredAds.length === 0 || activeSearch !== "") && relatedAds.length > 0 && (
+                {(finalDisplayAds.length === 0 || activeSearch !== "") && relatedAds.length > 0 && (
                   <div style={{ marginTop: 40 }}>
                     <h4 style={{ color: "#0088FF", fontSize: 16, marginBottom: 15, borderBottom: "2px solid #E2E8F0", paddingBottom: 8 }}>
                       💡 Veja anúncios relacionados em {selectedCity}
