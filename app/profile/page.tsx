@@ -72,7 +72,6 @@ export default function ProfileDashboard() {
   const [loading, setLoading] = useState(false);
   const [fetching, setFetching] = useState(true);
   const [user, setUser] = useState<any>(null);
-  const [debugInfo, setDebugInfo] = useState<string>("");
 
   const availableCities = ["Rubiácea-SP", "Guararapes-SP"];
 
@@ -87,7 +86,6 @@ export default function ProfileDashboard() {
       }
       
       setUser(user);
-      console.log("Usuário logado ID:", user.id);
 
       const { data: profileData } = await supabase
         .from("profiles")
@@ -134,23 +132,13 @@ export default function ProfileDashboard() {
 
       setLoadingAds(true);
 
-      // 🔹 BUSCA ROBUSTA: Tenta buscar por user_id e também exibe logs de depuração
-      console.log("Buscando anúncios para user_id:", user.id);
       const { data: adsData, error: adsError } = await supabase
         .from("ads")
         .select("*")
         .eq("user_id", user.id)
         .order("created_at", { ascending: false });
 
-      if (adsError) {
-        console.error("Erro ao buscar ads:", adsError);
-        setDebugInfo("Erro Supabase: " + adsError.message);
-      } else {
-        console.log("Anúncios encontrados para este usuário:", adsData);
-        setDebugInfo(`Encontrados ${adsData?.length || 0} anúncios para o ID ${user.id}`);
-      }
-
-      if (adsData && adsData.length > 0) {
+      if (!adsError && adsData && adsData.length > 0) {
         const { data: storiesData } = await supabase
           .from("stories")
           .select("ad_id")
@@ -607,11 +595,6 @@ export default function ProfileDashboard() {
                       ? "Cadastre produtos na sua vitrine e escolha quais aparecem nos classificados gerais (Validade de 10 dias na home)." 
                       : "Gerencie seus anúncios publicados no site."}
                   </p>
-                  {debugInfo && (
-                    <p style={{ color: "#D97706", fontSize: 12, marginTop: 6, fontWeight: "bold" }}>
-                      🔍 [Debug]: {debugInfo}
-                    </p>
-                  )}
                 </div>
                 <button onClick={() => window.location.href = "/create"} style={{ padding: "10px 14px", backgroundColor: activeThemeHex, color: "#fff", border: "none", borderRadius: 6, fontWeight: "bold", cursor: "pointer", fontSize: 13 }}>
                   {userType === "store" ? "+ Adicionar Produto" : "+ Novo Anúncio"}
@@ -651,32 +634,33 @@ export default function ProfileDashboard() {
                               {ad.price ? `R$ ${ad.price.toFixed(2)}` : "Valor a combinar"}
                             </p>
                             <span style={{ fontSize: 11, color: "#94A3B8" }}>
-                              » {ad.city} • {ad.category} {isExpired && isClassificadosActive && <span style={{ color: "#DC2626", fontWeight: "bold" }}>• Expirado da Home</span>}
+                              » {ad.city} {ad.category} {isExpired && isClassificadosActive && <span style={{ color: "#DC2626", fontWeight: "bold" }}>Expirado da Home</span>}
                             </span>
                           </div>
                         </div>
 
-                        <div style={{ display: "flex", gap: 6, flexShrink: 0, marginTop: 8, flexWrap: "wrap" }}>
+                        {/* 🔹 Container de botões totalmente responsivo para telemóveis (com wrap e largura flexível) */}
+                        <div style={{ display: "flex", gap: 6, flexShrink: 0, marginTop: 8, flexWrap: "wrap", width: "100%", justifyContent: "flex-start" }}>
                           {userType === "store" ? (
                             <>
                               {isExpired && isClassificadosActive ? (
                                 <button 
                                   onClick={() => handleRenewAd(ad.id)}
-                                  style={{ padding: "8px 12px", backgroundColor: "#D97706", color: "#fff", border: "none", borderRadius: 6, fontSize: 12, fontWeight: "bold", cursor: "pointer" }}
+                                  style={{ padding: "8px 12px", backgroundColor: "#D97706", color: "#fff", border: "none", borderRadius: 6, fontSize: 12, fontWeight: "bold", cursor: "pointer", flex: "1 1 auto" }}
                                 >
                                   ⚠️ Expirado, Anunciar Novamente
                                 </button>
                               ) : isClassificadosActive ? (
                                 <button 
                                   onClick={() => handleToggleClassificados(ad.id, true)}
-                                  style={{ padding: "8px 12px", backgroundColor: "#16A34A", color: "#fff", border: "none", borderRadius: 6, fontSize: 12, fontWeight: "bold", cursor: "pointer" }}
+                                  style={{ padding: "8px 12px", backgroundColor: "#16A34A", color: "#fff", border: "none", borderRadius: 6, fontSize: 12, fontWeight: "bold", cursor: "pointer", flex: "1 1 auto" }}
                                 >
-                                  ✓ Produto Anunciado nos Classificados
+                                  ✓ Anunciado nos Classificados
                                 </button>
                               ) : (
                                 <button 
                                   onClick={() => handleToggleClassificados(ad.id, false)}
-                                  style={{ padding: "8px 12px", backgroundColor: "#0284C7", color: "#fff", border: "none", borderRadius: 6, fontSize: 12, fontWeight: "bold", cursor: "pointer" }}
+                                  style={{ padding: "8px 12px", backgroundColor: "#0284C7", color: "#fff", border: "none", borderRadius: 6, fontSize: 12, fontWeight: "bold", cursor: "pointer", flex: "1 1 auto" }}
                                 >
                                   📢 Anunciar nos Classificados
                                 </button>
@@ -684,7 +668,7 @@ export default function ProfileDashboard() {
 
                               <button 
                                 onClick={() => handleToggleFeature(ad.id, !!ad.is_featured, ad.image_url)}
-                                style={{ padding: "8px 10px", backgroundColor: ad.is_featured ? "#FEF3C7" : "#10B981", color: ad.is_featured ? "#D97706" : "#fff", border: "none", borderRadius: 6, fontSize: 12, fontWeight: "bold", cursor: "pointer" }}
+                                style={{ padding: "8px 10px", backgroundColor: ad.is_featured ? "#FEF3C7" : "#10B981", color: ad.is_featured ? "#D97706" : "#fff", border: "none", borderRadius: 6, fontSize: 12, fontWeight: "bold", cursor: "pointer", flex: "1 1 auto" }}
                               >
                                 {ad.is_featured ? "⭐ Destacado" : "⚡ Destacar 24h"}
                               </button>
@@ -694,19 +678,19 @@ export default function ProfileDashboard() {
                               {isExpired ? (
                                 <button 
                                   onClick={() => handleRenewAd(ad.id)}
-                                  style={{ padding: "8px 12px", backgroundColor: "#0284C7", color: "#fff", border: "none", borderRadius: 6, fontSize: 12, fontWeight: "bold", cursor: "pointer" }}
+                                  style={{ padding: "8px 12px", backgroundColor: "#0284C7", color: "#fff", border: "none", borderRadius: 6, fontSize: 12, fontWeight: "bold", cursor: "pointer", flex: "1 1 auto" }}
                                 >
                                   🔄 Expirado, Anunciar Novamente
                                 </button>
                               ) : (
-                                <span style={{ padding: "8px 12px", backgroundColor: "#D1FAE5", color: "#065F46", borderRadius: 6, fontSize: 12, fontWeight: "bold" }}>
+                                <span style={{ padding: "8px 12px", backgroundColor: "#D1FAE5", color: "#065F46", borderRadius: 6, fontSize: 12, fontWeight: "bold", flex: "1 1 auto", textAlign: "center" }}>
                                   Anunciado nos Classificados
                                 </span>
                               )}
 
                               <button 
                                 onClick={() => handleMarkAsSold(ad.id, ad.title)}
-                                style={{ padding: "8px 12px", backgroundColor: "#DC2626", color: "#fff", border: "none", borderRadius: 6, fontSize: 12, fontWeight: "bold", cursor: "pointer" }}
+                                style={{ padding: "8px 12px", backgroundColor: "#DC2626", color: "#fff", border: "none", borderRadius: 6, fontSize: 12, fontWeight: "bold", cursor: "pointer", flex: "1 1 auto" }}
                               >
                                 ✅ Vendido
                               </button>
@@ -715,14 +699,14 @@ export default function ProfileDashboard() {
 
                           <button 
                             onClick={() => window.location.href = `/edit-ad/${ad.id}`}
-                            style={{ padding: "8px 12px", backgroundColor: "#E2E8F0", color: "#1E293B", border: "none", borderRadius: 6, fontSize: 12, fontWeight: "bold", cursor: "pointer" }}
+                            style={{ padding: "8px 12px", backgroundColor: "#E2E8F0", color: "#1E293B", border: "none", borderRadius: 6, fontSize: 12, fontWeight: "bold", cursor: "pointer", flex: "1 1 auto" }}
                           >
                             Editar
                           </button>
 
                           <button 
                             onClick={() => handleDeleteAd(ad.id, ad.title)}
-                            style={{ padding: "8px 12px", backgroundColor: "#FEE2E2", color: "#DC2626", border: "none", borderRadius: 6, fontSize: 12, fontWeight: "bold", cursor: "pointer" }}
+                            style={{ padding: "8px 12px", backgroundColor: "#FEE2E2", color: "#DC2626", border: "none", borderRadius: 6, fontSize: 12, fontWeight: "bold", cursor: "pointer", flex: "1 1 auto" }}
                           >
                             Excluir
                           </button>
