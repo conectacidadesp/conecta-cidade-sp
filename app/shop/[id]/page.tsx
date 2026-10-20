@@ -33,17 +33,32 @@ interface CartItem {
   quantity: number;
 }
 
+// 🎨 Mapeamento completo e flexível das cores do tema
 const THEMES: Record<string, { primary: string; bg: string; text: string; accent: string }> = {
+  "#0F4C81": { primary: "#0F4C81", bg: "#F8FAFC", text: "#1E293B", accent: "#22C55E" },
   blue: { primary: "#0F4C81", bg: "#F8FAFC", text: "#1E293B", accent: "#22C55E" },
+  "#0284C7": { primary: "#0284C7", bg: "#F0F9FF", text: "#0C4A6E", accent: "#0284C7" },
+  "#059669": { primary: "#059669", bg: "#ECFDF5", text: "#064E3B", accent: "#10B981" },
   emerald: { primary: "#059669", bg: "#ECFDF5", text: "#064E3B", accent: "#10B981" },
+  "#10B981": { primary: "#10B981", bg: "#ECFDF5", text: "#064E3B", accent: "#059669" },
+  "#7C3AED": { primary: "#7C3AED", bg: "#F5F3FF", text: "#4C1D95", accent: "#8B5CF6" },
   purple: { primary: "#7C3AED", bg: "#F5F3FF", text: "#4C1D95", accent: "#8B5CF6" },
-  darkGold: { primary: "#D97706", bg: "#18181B", text: "#F3F4F6", accent: "#F59E0B" },
+  "#E11D48": { primary: "#E11D48", bg: "#FFF1F2", text: "#881337", accent: "#F43F5E" },
   rose: { primary: "#E11D48", bg: "#FFF1F2", text: "#881337", accent: "#F43F5E" },
+  red: { primary: "#DC2626", bg: "#FEF2F2", text: "#7F1D1D", accent: "#EF4444" },
+  "#DC2626": { primary: "#DC2626", bg: "#FEF2F2", text: "#7F1D1D", accent: "#EF4444" },
+  "#EA580C": { primary: "#EA580C", bg: "#FFF7ED", text: "#7C2D12", accent: "#F97316" },
+  orange: { primary: "#EA580C", bg: "#FFF7ED", text: "#7C2D12", accent: "#F97316" },
+  "#D97706": { primary: "#D97706", bg: "#FFFBEB", text: "#78350F", accent: "#F59E0B" },
+  darkGold: { primary: "#D97706", bg: "#18181B", text: "#F3F4F6", accent: "#F59E0B" },
+  "#78350F": { primary: "#78350F", bg: "#FEF3C7", text: "#451A03", accent: "#D97706" },
+  "#475569": { primary: "#475569", bg: "#F8FAFC", text: "#0F172A", accent: "#64748B" },
+  "#0F172A": { primary: "#0F172A", bg: "#F1F5F9", text: "#020617", accent: "#334155" },
 };
 
-// 🕒 Função corrigida com fuso horário do Brasil (America/Sao_Paulo)
+// 🕒 Função com fuso horário do Brasil (America/Sao_Paulo)
 function checkIsOpen(openTime?: string, closeTime?: string) {
-  if (!openTime || !closeTime) return true; // Padrão aberto se o lojista não preencheu
+  if (!openTime || !closeTime) return true;
 
   const now = new Date();
   const formatter = new Intl.DateTimeFormat('en-US', {
@@ -139,8 +154,15 @@ function ShopContent() {
     loadShopData();
   }, [rawId, targetAdQuery]);
 
-  const activeThemeKey = profile?.theme_color && THEMES[profile.theme_color] ? profile.theme_color : "blue";
-  const theme = THEMES[activeThemeKey];
+  // Busca a cor dinâmica cadastrada no banco ou ajusta pelo código hexadecimal
+  const rawTheme = profile?.theme_color || "blue";
+  const theme = THEMES[rawTheme] || {
+    primary: rawTheme.startsWith("#") ? rawTheme : "#0F4C81",
+    bg: "#F8FAFC",
+    text: "#1E293B",
+    accent: "#22C55E",
+  };
+
   const isFoodMode = profile?.store_type === "food";
   const isOpen = checkIsOpen(profile?.open_time, profile?.close_time);
 
@@ -253,7 +275,7 @@ function ShopContent() {
           justifyContent: "space-between", 
           gap: "15px",
           marginBottom: "30px", 
-          backgroundColor: activeThemeKey === "darkGold" ? "#27272A" : `${theme.primary}12`,
+          backgroundColor: `${theme.primary}12`,
           border: `1px solid ${theme.primary}33`,
           borderRadius: "16px",
           padding: "20px 25px",
@@ -295,7 +317,7 @@ function ShopContent() {
                 </span>
               </div>
 
-              {/* 🛡️ Selo de Confiabilidade com a Data Real de Registro */}
+              {/* 🛡️ Selo de Confiabilidade */}
               {profile?.created_at && (
                 <p style={{ fontSize: 11, color: "#64748B", margin: "4px 0 0 0", display: "flex", alignItems: "center", gap: 4 }}>
                   <span>🛡️</span>
@@ -359,7 +381,7 @@ function ShopContent() {
                           display: "flex",
                           flexDirection: "column",
                           justifyContent: "space-between",
-                          boxShadow: isHighlighted ? "0 8px 25px rgba(0,0,0,0.15)" : "0 4px 12px rgba(0, 136, 255, 0.08)",
+                          boxShadow: isHighlighted ? "0 8px 25px rgba(0,0,0,0.15)" : "0 4px 12px rgba(0, 0, 0, 0.05)",
                           transform: isHighlighted ? "scale(1.02)" : "scale(1)",
                           transition: "all 0.3s ease",
                           position: "relative",

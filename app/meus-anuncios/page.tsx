@@ -87,8 +87,8 @@ export default function MeusAnunciosPage() {
               key={ad.id}
               style={{
                 display: "flex",
-                justifyContent: "space-between",
-                alignItems: "center",
+                flexDirection: "column", // 🔹 Ajustado para empilhar em telas menores
+                gap: 15,
                 padding: 15,
                 borderRadius: 8,
                 border: "1px solid #CBD5E1",
@@ -105,7 +105,8 @@ export default function MeusAnunciosPage() {
                 </p>
               </div>
 
-              <div style={{ display: "flex", gap: 10, alignItems: "center" }}>
+              {/* 🔹 Container dos botões flexível e responsivo */}
+              <div style={{ display: "flex", flexWrap: "wrap", gap: 10, alignItems: "center" }}>
                 {/* Botão de Editar */}
                 <button
                   onClick={() => router.push(`/edit-ad/${ad.id}`)}
@@ -117,6 +118,7 @@ export default function MeusAnunciosPage() {
                     borderRadius: 6,
                     cursor: "pointer",
                     fontWeight: "bold",
+                    flex: "1 1 auto", // Adapta o tamanho no telemóvel
                   }}
                 >
                   Editar
@@ -133,6 +135,7 @@ export default function MeusAnunciosPage() {
                       borderRadius: 6,
                       cursor: "pointer",
                       fontWeight: "bold",
+                      flex: "1 1 auto",
                     }}
                   >
                     Marcar como Vendido
@@ -149,6 +152,7 @@ export default function MeusAnunciosPage() {
                     borderRadius: 6,
                     cursor: "pointer",
                     fontWeight: "bold",
+                    flex: "1 1 auto",
                   }}
                 >
                   Excluir
