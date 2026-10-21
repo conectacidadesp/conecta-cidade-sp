@@ -444,17 +444,29 @@ export default function Home() {
 
   return (
     <div style={{ width: "100%", position: "relative" }}>
-      {/* 📱💻 Regra CSS Responsiva para Alinhamento Perfeito */}
+      {/* 📱💻 Regra CSS Responsiva para Grade do Feed e Afiliados */}
       <style jsx global>{`
         .ads-grid-container {
           display: grid;
           grid-template-columns: repeat(2, 1fr);
           gap: 12px;
         }
+        .affiliate-slot-card {
+          grid-column: span 2;
+          width: 100%;
+          overflow: hidden;
+        }
         @media (min-width: 768px) {
           .ads-grid-container {
             grid-template-columns: repeat(auto-fill, minmax(230px, 1fr));
             gap: 20px;
+          }
+          .affiliate-slot-card {
+            grid-column: span 1 !important;
+          }
+          .affiliate-slot-card > div {
+            max-width: 100% !important;
+            width: 100% !important;
           }
         }
       `}</style>
@@ -572,7 +584,7 @@ export default function Home() {
                       if ((index + 1) % 4 === 0) {
                         const affiliateSlotIndex = Math.floor(index / 4);
                         elements.push(
-                          <div key={`affiliate-slot-${index}`} style={{ display: "flex", alignItems: "center", justifyContent: "center", width: "100%" }}>
+                          <div key={`affiliate-slot-${index}`} className="affiliate-slot-card">
                             <AffiliateRotativeCard intervalSeconds={5} affiliateIndex={affiliateSlotIndex} />
                           </div>
                         );
@@ -650,7 +662,7 @@ export default function Home() {
             src={previewImage} 
             alt="Ampliada" 
             style={{
-              maxWidth: "95vw",
+              maxWidth: "90vw",
               maxHeight: "85vh",
               objectFit: "contain",
               borderRadius: "8px",
