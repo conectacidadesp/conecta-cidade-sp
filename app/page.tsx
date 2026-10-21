@@ -444,7 +444,7 @@ export default function Home() {
 
   return (
     <div style={{ width: "100%", position: "relative" }}>
-      {/* 📱💻 Regra CSS Responsiva: 2 colunas no celular e 4 no computador */}
+      {/* 📱💻 Regra CSS Responsiva para Alinhamento Perfeito */}
       <style jsx global>{`
         .ads-grid-container {
           display: grid;
@@ -572,7 +572,7 @@ export default function Home() {
                       if ((index + 1) % 4 === 0) {
                         const affiliateSlotIndex = Math.floor(index / 4);
                         elements.push(
-                          <div key={`affiliate-slot-${index}`} style={{ display: "flex", alignItems: "center", justifyContent: "center", gridColumn: "1 / -1" }}>
+                          <div key={`affiliate-slot-${index}`} style={{ display: "flex", alignItems: "center", justifyContent: "center", width: "100%" }}>
                             <AffiliateRotativeCard intervalSeconds={5} affiliateIndex={affiliateSlotIndex} />
                           </div>
                         );
@@ -602,7 +602,7 @@ export default function Home() {
         )}
       </main>
 
-      {/* 🔍 MODAL DE VISUALIZAÇÃO DE IMAGEM EM TELA CHEIA (ZOOM) */}
+      {/* 🔍 MODAL DE VISUALIZAÇÃO DE IMAGEM EM TELA CHEIA (ZOOM 100% CENTRALIZADO) */}
       {previewImage && (
         <div 
           onClick={() => setPreviewImage(null)}
@@ -612,31 +612,36 @@ export default function Home() {
             left: 0,
             width: "100vw",
             height: "100vh",
-            backgroundColor: "rgba(0, 0, 0, 0.9)",
+            backgroundColor: "rgba(0, 0, 0, 0.92)",
             display: "flex",
             alignItems: "center",
             justifyContent: "center",
-            zIndex: 99999,
-            padding: 16,
+            zIndex: 999999,
+            padding: "16px",
+            boxSizing: "border-box",
             cursor: "zoom-out"
           }}
         >
           <button 
             onClick={() => setPreviewImage(null)}
             style={{
-              position: "absolute",
-              top: 20,
-              right: 20,
+              position: "fixed",
+              top: "15px",
+              right: "15px",
               backgroundColor: "#ffffff",
               color: "#000000",
               border: "none",
               borderRadius: "50%",
-              width: 40,
-              height: 40,
-              fontSize: 20,
+              width: "42px",
+              height: "42px",
+              fontSize: "22px",
               fontWeight: "bold",
               cursor: "pointer",
-              boxShadow: "0 2px 10px rgba(0,0,0,0.5)"
+              boxShadow: "0 4px 15px rgba(0,0,0,0.6)",
+              zIndex: 1000000,
+              display: "flex",
+              alignItems: "center",
+              justifyContent: "center"
             }}
           >
             ✕
@@ -645,11 +650,11 @@ export default function Home() {
             src={previewImage} 
             alt="Ampliada" 
             style={{
-              maxWidth: "100%",
-              maxHeight: "90vh",
+              maxWidth: "95vw",
+              maxHeight: "85vh",
               objectFit: "contain",
-              borderRadius: 8,
-              boxShadow: "0 4px 20px rgba(255,255,255,0.1)"
+              borderRadius: "8px",
+              boxShadow: "0 4px 25px rgba(0,0,0,0.8)"
             }} 
           />
         </div>
@@ -672,7 +677,7 @@ export default function Home() {
             margin: "0 16px"
           }}>
             <h3 style={{ margin: "0 0 10px", color: "#1E293B", fontSize: 18 }}>Denunciar Anúncio</h3>
-            <p style={{ fontSize: 13, color: "#64748B", margin: "0 0 15px", wordBreak: "break-word" }}>Anúncio: <strong>{reportingAd.title}</strong></p>
+            <p style={{ fontSize: 13, color: "#64748B", margin: "0 0 15px", wordBreak: "word-wrap" }}>Anúncio: <strong>{reportingAd.title}</strong></p>
             <form onSubmit={handleSendReport}>
               <div style={{ marginBottom: 15 }}>
                 <label style={{ display: "block", fontSize: 13, fontWeight: "bold", marginBottom: 5, color: "#334155" }}>Motivo:</label>
