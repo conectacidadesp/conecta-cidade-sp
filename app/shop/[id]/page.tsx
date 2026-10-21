@@ -22,6 +22,7 @@ interface StoreProfile {
   logo_url: string | null;
   banner_url?: string | null;
   theme_color?: string | null;
+  font_style?: string | null;
   store_type?: "marketplace" | "food";
   open_time?: string;
   close_time?: string;
@@ -35,31 +36,46 @@ interface CartItem {
 
 // 🎨 Mapeamento completo e flexível das cores do tema
 const THEMES: Record<string, { primary: string; bg: string; text: string; accent: string }> = {
-  "#0F4C81": { primary: "#0F4C81", bg: "#F8FAFC", text: "#1E293B", accent: "#22C55E" },
   blue: { primary: "#0F4C81", bg: "#F8FAFC", text: "#1E293B", accent: "#22C55E" },
+  "#0F4C81": { primary: "#0F4C81", bg: "#F8FAFC", text: "#1E293B", accent: "#22C55E" },
+  sky: { primary: "#0284C7", bg: "#F0F9FF", text: "#0C4A6E", accent: "#0284C7" },
   "#0284C7": { primary: "#0284C7", bg: "#F0F9FF", text: "#0C4A6E", accent: "#0284C7" },
-  "#059669": { primary: "#059669", bg: "#ECFDF5", text: "#064E3B", accent: "#10B981" },
   emerald: { primary: "#059669", bg: "#ECFDF5", text: "#064E3B", accent: "#10B981" },
+  "#059669": { primary: "#059669", bg: "#ECFDF5", text: "#064E3B", accent: "#10B981" },
+  lime: { primary: "#10B981", bg: "#ECFDF5", text: "#064E3B", accent: "#059669" },
   "#10B981": { primary: "#10B981", bg: "#ECFDF5", text: "#064E3B", accent: "#059669" },
-  "#7C3AED": { primary: "#7C3AED", bg: "#F5F3FF", text: "#4C1D95", accent: "#8B5CF6" },
   purple: { primary: "#7C3AED", bg: "#F5F3FF", text: "#4C1D95", accent: "#8B5CF6" },
-  "#E11D48": { primary: "#E11D48", bg: "#FFF1F2", text: "#881337", accent: "#F43F5E" },
+  "#7C3AED": { primary: "#7C3AED", bg: "#F5F3FF", text: "#4C1D95", accent: "#8B5CF6" },
   rose: { primary: "#E11D48", bg: "#FFF1F2", text: "#881337", accent: "#F43F5E" },
+  "#E11D48": { primary: "#E11D48", bg: "#FFF1F2", text: "#881337", accent: "#F43F5E" },
+  orange: { primary: "#F97316", bg: "#FFF7ED", text: "#7C2D12", accent: "#F97316" },
+  "#EA580C": { primary: "#EA580C", bg: "#FFF7ED", text: "#7C2D12", accent: "#F97316" },
+  "#F97316": { primary: "#F97316", bg: "#FFF7ED", text: "#7C2D12", accent: "#EA580C" },
   red: { primary: "#DC2626", bg: "#FEF2F2", text: "#7F1D1D", accent: "#EF4444" },
   "#DC2626": { primary: "#DC2626", bg: "#FEF2F2", text: "#7F1D1D", accent: "#EF4444" },
-  "#EA580C": { primary: "#EA580C", bg: "#FFF7ED", text: "#7C2D12", accent: "#F97316" },
-  orange: { primary: "#EA580C", bg: "#FFF7ED", text: "#7C2D12", accent: "#F97316" },
+  darkGold: { primary: "#D97706", bg: "#FFFBEB", text: "#78350F", accent: "#F59E0B" },
   "#D97706": { primary: "#D97706", bg: "#FFFBEB", text: "#78350F", accent: "#F59E0B" },
-  darkGold: { primary: "#D97706", bg: "#18181B", text: "#F3F4F6", accent: "#F59E0B" },
+  brown: { primary: "#78350F", bg: "#FEF3C7", text: "#451A03", accent: "#D97706" },
   "#78350F": { primary: "#78350F", bg: "#FEF3C7", text: "#451A03", accent: "#D97706" },
+  slate: { primary: "#475569", bg: "#F8FAFC", text: "#0F172A", accent: "#64748B" },
   "#475569": { primary: "#475569", bg: "#F8FAFC", text: "#0F172A", accent: "#64748B" },
+  black: { primary: "#0F172A", bg: "#F1F5F9", text: "#020617", accent: "#334155" },
   "#0F172A": { primary: "#0F172A", bg: "#F1F5F9", text: "#020617", accent: "#334155" },
+};
+
+// 🔤 Mapeamento das famílias de fontes
+const FONT_FAMILIES: Record<string, string> = {
+  sans: "system-ui, -apple-system, sans-serif",
+  serif: "Georgia, Cambria, 'Times New Roman', serif",
+  mono: "Menlo, Monaco, Consolas, monospace",
+  rounded: "'Comic Sans MS', 'Quicksand', 'Nunito', sans-serif",
+  display: "'Impact', 'Arial Black', sans-serif",
+  cursive: "'Brush Script MT', 'Lucida Handwriting', cursive",
 };
 
 // 🕒 Função com fuso horário do Brasil (America/Sao_Paulo)
 function checkIsOpen(openTime?: string, closeTime?: string) {
   if (!openTime || !closeTime) return true;
-
   const now = new Date();
   const formatter = new Intl.DateTimeFormat('en-US', {
     timeZone: 'America/Sao_Paulo',
@@ -67,24 +83,20 @@ function checkIsOpen(openTime?: string, closeTime?: string) {
     minute: 'numeric',
     hour12: false,
   });
-
   const parts = formatter.formatToParts(now);
   const hours = parts.find((p) => p.type === "hour")?.value || "00";
   const minutes = parts.find((p) => p.type === "minute")?.value || "00";
   
   const normalizedHours = hours === "24" ? "00" : hours.padStart(2, "0");
   const currentTime = `${normalizedHours}:${minutes.padStart(2, "0")}`;
-
   return currentTime >= openTime && currentTime <= closeTime;
 }
 
 function ShopContent() {
   const params = useParams();
   const searchParams = useSearchParams();
-
   const rawId = params?.id as string;
   const targetAdQuery = searchParams.get("ad");
-
   const [ads, setAds] = useState<Ad[]>([]);
   const [profile, setProfile] = useState<StoreProfile | null>(null);
   const [highlightedAdId, setHighlightedAdId] = useState<string | null>(null);
@@ -97,60 +109,48 @@ function ShopContent() {
   const [customerAddress, setCustomerAddress] = useState("");
   const [paymentMethod, setPaymentMethod] = useState("Pix");
   const [orderNotes, setOrderNotes] = useState("");
-
   const targetAdRef = useRef<HTMLDivElement | null>(null);
 
   useEffect(() => {
     async function loadShopData() {
       if (!rawId) return;
       setLoading(true);
-
       let storeUserId = rawId;
       let adIdToHighlight = targetAdQuery;
-
       const { data: directAd } = await supabase
         .from("ads")
         .select("*")
         .eq("id", rawId)
         .maybeSingle();
-
       if (directAd) {
         storeUserId = directAd.user_id;
         adIdToHighlight = directAd.id;
       }
-
       setHighlightedAdId(adIdToHighlight);
-
       const { data: profileData, error: profileError } = await supabase
         .from("profiles")
         .select("*")
         .eq("id", storeUserId)
         .maybeSingle();
-
       if (profileData && !profileError) {
         setProfile(profileData);
       }
-
       const { data: adsData } = await supabase
         .from("ads")
         .select("*")
         .eq("user_id", storeUserId)
         .or("is_hidden.is.null,is_hidden.eq.false")
         .order("created_at", { ascending: false });
-
       if (adsData) {
         setAds(adsData);
       }
-
       setLoading(false);
-
       setTimeout(() => {
         if (targetAdRef.current) {
           targetAdRef.current.scrollIntoView({ behavior: "smooth", block: "center" });
         }
       }, 400);
     }
-
     loadShopData();
   }, [rawId, targetAdQuery]);
 
@@ -162,6 +162,10 @@ function ShopContent() {
     text: "#1E293B",
     accent: "#22C55E",
   };
+
+  // 🔤 Busca a fonte dinâmica cadastrada no banco
+  const rawFontKey = profile?.font_style || "sans";
+  const activeFontFamily = FONT_FAMILIES[rawFontKey] || FONT_FAMILIES.sans;
 
   const isFoodMode = profile?.store_type === "food";
   const isOpen = checkIsOpen(profile?.open_time, profile?.close_time);
@@ -201,25 +205,20 @@ function ShopContent() {
 
   const handleSendOrder = () => {
     if (cart.length === 0) return;
-
     const storeWhatsapp = ads[0]?.whatsapp || "";
     const formattedPhone = storeWhatsapp.replace(/\D/g, "");
-
     let message = `🚀 *Olá! Estou vindo do ConectaCidadeSp para realizar meu pedido!*\n\n`;
     message += `*🍕 NOVO PEDIDO - ${profile?.store_name || "Delivery"}*\n\n`;
     message += `*Cliente:* ${customerName || "Não informado"}\n`;
     if (customerAddress) message += `*Endereço:* ${customerAddress}\n`;
     message += `*Pagamento:* ${paymentMethod}\n`;
     if (orderNotes) message += `*Obs:* ${orderNotes}\n`;
-
     message += `\n*ITENS DO PEDIDO:*\n`;
     cart.forEach((item) => {
       const itemTotal = (item.ad.price || 0) * item.quantity;
       message += `▪ ${item.quantity}x ${item.ad.title} - R$ ${itemTotal.toFixed(2)}\n`;
     });
-
     message += `\n*TOTAL: R$ ${cartTotal.toFixed(2)}*`;
-
     const waUrl = `https://wa.me/55${formattedPhone}?text=${encodeURIComponent(message)}`;
     window.open(waUrl, "_blank");
   };
@@ -238,15 +237,17 @@ function ShopContent() {
   }, {});
 
   return (
-    <div style={{ minHeight: "100vh", backgroundColor: theme.bg, color: theme.text, paddingBottom: "100px" }}>
+    <div style={{ minHeight: "100vh", backgroundColor: theme.bg, color: theme.text, paddingBottom: "100px", fontFamily: activeFontFamily }}>
       <style jsx global>{`
+        body {
+          font-family: ${activeFontFamily};
+        }
         .title-clamp {
           display: -webkit-box;
           -webkit-line-clamp: 2;
           -webkit-box-orient: vertical;
           overflow: hidden;
         }
-
         .desc-clamp {
           display: -webkit-box;
           -webkit-line-clamp: 2;
@@ -254,7 +255,6 @@ function ShopContent() {
           overflow: hidden;
         }
       `}</style>
-
       {/* 🖼️ CAPA DA LOJA */}
       {profile?.banner_url && (
         <div style={{ width: "100%", height: "220px", overflow: "hidden", position: "relative" }}>
@@ -265,7 +265,6 @@ function ShopContent() {
           />
         </div>
       )}
-
       <main style={{ maxWidth: "1200px", margin: "0 auto", padding: "0 20px" }}>
         {/* Header da Loja */}
         <div style={{ 
@@ -299,7 +298,6 @@ function ShopContent() {
               <p style={{ color: theme.text, opacity: 0.8, margin: "4px 0", fontSize: "13px", lineHeight: "1.3" }}>
                 {isFoodMode ? "🍔 Faça seu pedido online no nosso cardápio virtual!" : "Confira todo o nosso estoque virtual ativo abaixo"}
               </p>
-
               {/* 🟢🔴 Indicador Visual de Aberto / Fechado em tempo real */}
               <div style={{ display: "flex", alignItems: "center", gap: 6, fontSize: 12, fontWeight: "bold", margin: "6px 0", padding: "3px 8px", backgroundColor: isOpen ? "#ECFDF5" : "#FEF2F2", borderRadius: 6, width: "fit-content" }}>
                 <span style={{ 
@@ -316,7 +314,6 @@ function ShopContent() {
                   ({profile?.open_time || "08:00"} às {profile?.close_time || "18:00"})
                 </span>
               </div>
-
               {/* 🛡️ Selo de Confiabilidade */}
               {profile?.created_at && (
                 <p style={{ fontSize: 11, color: "#64748B", margin: "4px 0 0 0", display: "flex", alignItems: "center", gap: 4 }}>
@@ -326,12 +323,10 @@ function ShopContent() {
               )}
             </div>
           </div>
-
           <span style={{ backgroundColor: theme.primary, color: "#fff", fontSize: "12px", fontWeight: "bold", padding: "8px 14px", borderRadius: "20px", boxShadow: "0 2px 8px rgba(0,0,0,0.15)", whiteSpace: "nowrap" }}>
             {isFoodMode ? "🍟 Modo Delivery & Cardápio" : "🛍️ Modo Loja / Marketplace"}
           </span>
         </div>
-
         {/* Produtos e Categorias em Grade Lateral Profissional */}
         {ads.length === 0 ? (
           <p style={{ color: "#64748B" }}>Esta loja ainda não publicou produtos no estoque.</p>
@@ -347,7 +342,6 @@ function ShopContent() {
                     {items.length} {items.length === 1 ? "item" : "itens"}
                   </span>
                 </div>
-
                 {/* Grade Responsiva Lateral para Computador e Celular */}
                 <div style={{
                   display: "grid",
@@ -356,19 +350,15 @@ function ShopContent() {
                 }}>
                   {items.map((ad, idx) => {
                     const isHighlighted = ad.id === highlightedAdId;
-
                     const formattedPrice = ad.price ? `R$ ${ad.price.toFixed(2)}` : "A combinar";
                     const imageText = ad.image_url ? ad.image_url : "Nenhuma foto informada";
                     const adLink = typeof window !== "undefined" ? `${window.location.origin}` : "";
-
                     const marketMessage = `🚀 Estou vindo do *Conecta Cidade Sp* e tenho interesse neste produto:
-
 📦 ${ad.title}
 💰 ${formattedPrice}
 📝 Detalhes: ${ad.description || "Sem descrição"}
 🖼️ Foto do produto: ${imageText}
 🔗 Ver anúncio: ${adLink}`;
-
                     return (
                       <div
                         key={`${ad.id}-${idx}`}
@@ -392,7 +382,6 @@ function ShopContent() {
                             ⚡ Em Destaque
                           </span>
                         )}
-
                         <div>
                           {ad.image_url ? (
                             <div style={{ width: "100%", height: "180px", backgroundColor: "#F8FAFC", display: "flex", alignItems: "center", justifyContent: "center", padding: 10, borderBottom: "1px solid #F1F5F9" }}>
@@ -410,12 +399,10 @@ function ShopContent() {
                             </p>
                           </div>
                         </div>
-
                         <div style={{ padding: "14px", paddingTop: 0 }}>
                           <p style={{ fontSize: "18px", fontWeight: "bold", color: theme.primary, margin: "10px 0" }}>
                             {formattedPrice}
                           </p>
-
                           {isFoodMode ? (
                             <button
                               onClick={() => addToCart(ad)}
@@ -453,7 +440,6 @@ function ShopContent() {
           })
         )}
       </main>
-
       {/* CARRINHO FLUTUANTE */}
       {isFoodMode && cart.length > 0 && (
         <div
@@ -480,7 +466,6 @@ function ShopContent() {
           <span style={{ backgroundColor: "#15803D", padding: "4px 10px", borderRadius: "15px" }}>R$ {cartTotal.toFixed(2)}</span>
         </div>
       )}
-
       {/* MODAL / GAVETA DO CARRINHO */}
       {isCartOpen && (
         <div style={{ position: "fixed", top: 0, left: 0, width: "100vw", height: "100vh", backgroundColor: "rgba(0,0,0,0.6)", zIndex: 9999, display: "flex", justifyContent: "flex-end" }}>
@@ -489,7 +474,6 @@ function ShopContent() {
               <h2 style={{ fontSize: "20px", margin: 0, color: "#1E293B" }}>🛍️ Seu Pedido</h2>
               <button onClick={() => setIsCartOpen(false)} style={{ background: "none", border: "none", fontSize: "20px", cursor: "pointer" }}>✕</button>
             </div>
-
             {/* LISTA DE ITENS */}
             <div style={{ marginTop: "20px", display: "flex", flexDirection: "column", gap: "15px" }}>
               {cart.length === 0 ? (
@@ -511,7 +495,6 @@ function ShopContent() {
                 ))
               )}
             </div>
-
             {/* DADOS DA ENTREGA */}
             {cart.length > 0 && (
               <div style={{ marginTop: "25px", marginBottom: "30px", display: "flex", flexDirection: "column", gap: "12px" }}>
@@ -526,7 +509,6 @@ function ShopContent() {
                 <input type="text" placeholder="Observações (ex: tirar cebola)" value={orderNotes} onChange={(e) => setOrderNotes(e.target.value)} style={{ width: "100%", padding: "10px", borderRadius: "6px", border: "1px solid #CBD5E1", fontSize: "13px" }} />
               </div>
             )}
-
             {/* BOTÃO FIXADO DE FINALIZAR PEDIDO */}
             {cart.length > 0 && (
               <div style={{ borderTop: "2px solid #E2E8F0", paddingTop: "15px", marginTop: "auto", paddingBottom: "25px", backgroundColor: "#fff" }}>

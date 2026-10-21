@@ -86,7 +86,6 @@ export default function ProfileDashboard() {
       }
       
       setUser(user);
-
       const { data: profileData } = await supabase
         .from("profiles")
         .select("*")
@@ -212,6 +211,7 @@ export default function ProfileDashboard() {
       user.email?.endsWith("@client.conectacidade.local") || 
       user.phone;
 
+    // 🔹 CORREÇÃO AQUI: Incluído o font_style para salvar perfeitamente no Supabase
     const profileData: any = {
       id: user.id,
       store_name: storeName,
@@ -221,7 +221,7 @@ export default function ProfileDashboard() {
       store_type: storeType,
       logo_url: uploadedLogoUrl,
       theme_color: themeColor,
-      font_style: fontStyle,
+      font_style: fontStyle, 
       banner_url: uploadedBannerUrl,
       open_time: openTime,
       close_time: closeTime,
@@ -639,7 +639,7 @@ export default function ProfileDashboard() {
                           </div>
                         </div>
 
-                        {/* 🔹 Container de botões totalmente responsivo para telemóveis (com wrap e largura flexível) */}
+                        {/* 🔹 Container de botões totalmente responsivo para telemóveis */}
                         <div style={{ display: "flex", gap: 6, flexShrink: 0, marginTop: 8, flexWrap: "wrap", width: "100%", justifyContent: "flex-start" }}>
                           {userType === "store" ? (
                             <>
