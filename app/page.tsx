@@ -59,6 +59,9 @@ export default function Home() {
   const [reportReason, setReportReason] = useState("Conteúdo impróprio / Proibido");
   const [reportDetails, setReportDetails] = useState("");
   const [submittingReport, setSubmittingReport] = useState(false);
+  
+  // 🔍 Estado para visualização de imagem em tela cheia (Zoom)
+  const [previewImage, setPreviewImage] = useState<string | null>(null);
 
   useEffect(() => {
     if (typeof window !== "undefined") {
@@ -230,7 +233,10 @@ export default function Home() {
         boxShadow: "0 10px 25px -5px rgba(0, 0, 0, 0.05), 0 8px 10px -6px rgba(0, 0, 0, 0.05)",
         transition: "transform 0.2s ease, box-shadow 0.2s ease"
       }}>
-        <div style={{ width: "100%", height: 110, backgroundColor: "#0088FF", position: "relative" }}>
+        <div 
+          style={{ width: "100%", height: 110, backgroundColor: "#0088FF", position: "relative", cursor: storeBanner ? "pointer" : "default" }}
+          onClick={() => storeBanner && setPreviewImage(storeBanner)}
+        >
           {storeBanner ? (
             <img src={storeBanner} alt="Capa" style={{ width: "100%", height: "100%", objectFit: "cover" }} />
           ) : (
@@ -238,7 +244,10 @@ export default function Home() {
           )}
         </div>
         <div style={{ padding: "0 16px", position: "relative", marginTop: -35, display: "flex", alignItems: "flex-end", justifyContent: "space-between" }}>
-          <div style={{ width: 70, height: 70, borderRadius: "50%", border: "3px solid #ffffff", backgroundColor: "#F1F5F9", overflow: "hidden", boxShadow: "0 2px 8px rgba(0,0,0,0.15)" }}>
+          <div 
+            style={{ width: 70, height: 70, borderRadius: "50%", border: "3px solid #ffffff", backgroundColor: "#F1F5F9", overflow: "hidden", boxShadow: "0 2px 8px rgba(0,0,0,0.15)", cursor: storeLogo ? "pointer" : "default" }}
+            onClick={() => storeLogo && setPreviewImage(storeLogo)}
+          >
             {storeLogo ? (
               <img src={storeLogo} alt="Logo" style={{ width: "100%", height: "100%", objectFit: "cover" }} />
             ) : (
@@ -350,9 +359,26 @@ export default function Home() {
             </span>
           </div>
         )}
-        <div style={{ width: "100%", height: 160, backgroundColor: "#F8FAFC", display: "flex", alignItems: "center", justifyContent: "center", overflow: "hidden", borderBottom: "1px solid #F1F5F9", position: "relative" }}>
+        <div 
+          onClick={() => ad.image_url && setPreviewImage(ad.image_url)}
+          style={{ 
+            width: "100%", 
+            height: 160, 
+            backgroundColor: "#F8FAFC", 
+            display: "flex", 
+            alignItems: "center", 
+            justifyContent: "center", 
+            overflow: "hidden", 
+            borderBottom: "1px solid #F1F5F9", 
+            position: "relative",
+            cursor: ad.image_url ? "pointer" : "default"
+          }}
+        >
           {ad.image_url ? (
-            <img src={ad.image_url} alt={ad.title} style={{ width: "100%", height: "100%", objectFit: "cover", objectPosition: "center" }} />
+            <>
+              <img src={ad.image_url} alt={ad.title} style={{ width: "100%", height: "100%", objectFit: "cover", objectPosition: "center" }} />
+              <span style={{ position: "absolute", bottom: 6, right: 6, backgroundColor: "rgba(0,0,0,0.6)", color: "#fff", padding: "2px 6px", borderRadius: 4, fontSize: 10 }}>🔍 Zoom</span>
+            </>
           ) : (
             <span style={{ color: "#94A3B8", fontSize: 14 }}>Sem Foto</span>
           )}
@@ -418,6 +444,21 @@ export default function Home() {
 
   return (
     <div style={{ width: "100%", position: "relative" }}>
+      {/* 📱💻 Regra CSS Responsiva: 2 colunas no celular e 4 no computador */}
+      <style jsx global>{`
+        .ads-grid-container {
+          display: grid;
+          grid-template-columns: repeat(2, 1fr);
+          gap: 12px;
+        }
+        @media (min-width: 768px) {
+          .ads-grid-container {
+            grid-template-columns: repeat(auto-fill, minmax(230px, 1fr));
+            gap: 20px;
+          }
+        }
+      `}</style>
+
       <section style={{ backgroundColor: "#0F4C81", color: "#fff", padding: "30px 20px", textAlign: "center", borderRadius: 8, marginBottom: 20, boxShadow: "0 4px 15px rgba(15,76,129,0.2)" }}>
         <div style={{ maxWidth: 650, margin: "0 auto" }}>
           <h2 style={{ margin: "0 0 15px", fontSize: 22 }}>Encontre tudo o que precisa na sua cidade</h2>
@@ -514,7 +555,7 @@ export default function Home() {
           <>
             {selectedCategory === "Comércio Local" ? (
               filteredProfiles.length > 0 ? (
-                <div style={{ display: "grid", gridTemplateColumns: "repeat(2, 1fr)", gap: 12 }}>
+                <div className="ads-grid-container">
                   {filteredProfiles.map(renderProfileCard)}
                 </div>
               ) : (
@@ -525,13 +566,13 @@ export default function Home() {
             ) : (
               <>
                 {finalDisplayAds.length > 0 ? (
-                  <div style={{ display: "grid", gridTemplateColumns: "repeat(2, 1fr)", gap: 12 }}>
+                  <div className="ads-grid-container">
                     {finalDisplayAds.map((ad, index) => {
                       const elements = [renderAdCard(ad)];
                       if ((index + 1) % 4 === 0) {
                         const affiliateSlotIndex = Math.floor(index / 4);
                         elements.push(
-                          <div key={`affiliate-slot-${index}`} style={{ display: "flex", alignItems: "center", justifyContent: "center", gridColumn: "span 2" }}>
+                          <div key={`affiliate-slot-${index}`} style={{ display: "flex", alignItems: "center", justifyContent: "center", gridColumn: "1 / -1" }}>
                             <AffiliateRotativeCard intervalSeconds={5} affiliateIndex={affiliateSlotIndex} />
                           </div>
                         );
@@ -550,7 +591,7 @@ export default function Home() {
                     <h4 style={{ color: "#0088FF", fontSize: 16, marginBottom: 15, borderBottom: "2px solid #E2E8F0", paddingBottom: 8 }}>
                       💡 Veja anúncios relacionados em {selectedCity}
                     </h4>
-                    <div style={{ display: "grid", gridTemplateColumns: "repeat(2, 1fr)", gap: 12 }}>
+                    <div className="ads-grid-container">
                       {relatedAds.map(renderAdCard)}
                     </div>
                   </div>
@@ -560,6 +601,59 @@ export default function Home() {
           </>
         )}
       </main>
+
+      {/* 🔍 MODAL DE VISUALIZAÇÃO DE IMAGEM EM TELA CHEIA (ZOOM) */}
+      {previewImage && (
+        <div 
+          onClick={() => setPreviewImage(null)}
+          style={{
+            position: "fixed",
+            top: 0,
+            left: 0,
+            width: "100vw",
+            height: "100vh",
+            backgroundColor: "rgba(0, 0, 0, 0.9)",
+            display: "flex",
+            alignItems: "center",
+            justifyContent: "center",
+            zIndex: 99999,
+            padding: 16,
+            cursor: "zoom-out"
+          }}
+        >
+          <button 
+            onClick={() => setPreviewImage(null)}
+            style={{
+              position: "absolute",
+              top: 20,
+              right: 20,
+              backgroundColor: "#ffffff",
+              color: "#000000",
+              border: "none",
+              borderRadius: "50%",
+              width: 40,
+              height: 40,
+              fontSize: 20,
+              fontWeight: "bold",
+              cursor: "pointer",
+              boxShadow: "0 2px 10px rgba(0,0,0,0.5)"
+            }}
+          >
+            ✕
+          </button>
+          <img 
+            src={previewImage} 
+            alt="Ampliada" 
+            style={{
+              maxWidth: "100%",
+              maxHeight: "90vh",
+              objectFit: "contain",
+              borderRadius: 8,
+              boxShadow: "0 4px 20px rgba(255,255,255,0.1)"
+            }} 
+          />
+        </div>
+      )}
 
       {reportingAd && (
         <div style={{ 
