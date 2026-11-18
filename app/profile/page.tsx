@@ -15,6 +15,7 @@ interface Ad {
   created_at?: string;
   show_in_classificados?: boolean;
   user_id?: string;
+  display_order?: number;
 }
 
 const CITIES_LIST = [
@@ -58,12 +59,11 @@ export default function ProfileDashboard() {
   const [bio, setBio] = useState("");
   const [whatsapp, setWhatsapp] = useState("");
   const [storeType, setStoreType] = useState<"marketplace" | "food">("marketplace");
-  const [deliveryFeeDisplay, setDeliveryFeeDisplay] = useState(""); // 👈 Exibição formatada da taxa de entrega
-  const [rawDeliveryFee, setRawDeliveryFee] = useState<number | null>(0); // 👈 Valor numérico para salvar
-
+  const [deliveryFeeDisplay, setDeliveryFeeDisplay] = useState(""); 
+  const [rawDeliveryFee, setRawDeliveryFee] = useState<number | null>(0); 
   const [currentLogoUrl, setCurrentLogoUrl] = useState<string | null>(null);
   const [logoFile, setLogoFile] = useState<File | null>(null);
-
+  
   // Horários e Criação
   const [openTime, setOpenTime] = useState("08:00");
   const [closeTime, setCloseTime] = useState("18:00");
@@ -112,7 +112,6 @@ export default function ProfileDashboard() {
       if (type === "client") {
         setActiveTab("anuncios");
       }
-
       if (profileData) {
         setStoreName(profileData.store_name || "");
         setCity(profileData.city || "Rubiácea-SP");
@@ -122,7 +121,6 @@ export default function ProfileDashboard() {
         setWhatsapp(profileData.whatsapp || "");
         setStoreType(profileData.store_type || "marketplace");
         
-        // Carrega a Taxa de Entrega
         if (profileData.delivery_fee !== null && profileData.delivery_fee !== undefined) {
           setRawDeliveryFee(profileData.delivery_fee);
           setDeliveryFeeDisplay(profileData.delivery_fee.toLocaleString("pt-BR", { style: "currency", currency: "BRL" }));
@@ -130,7 +128,6 @@ export default function ProfileDashboard() {
           setDeliveryFeeDisplay("");
           setRawDeliveryFee(0);
         }
-
         setCurrentLogoUrl(profileData.logo_url || null);
         setThemeColor(profileData.theme_color || "blue");
         setFontStyle(profileData.font_style || "sans");
@@ -152,6 +149,7 @@ export default function ProfileDashboard() {
         .from("ads")
         .select("*")
         .eq("user_id", user.id)
+        .order("display_order", { ascending: true, nullsFirst: false })
         .order("created_at", { ascending: false });
 
       if (!adsError && adsData && adsData.length > 0) {
@@ -159,7 +157,6 @@ export default function ProfileDashboard() {
           .from("stories")
           .select("ad_id")
           .eq("profile_id", user.id);
-
         const featuredAdIds = new Set(storiesData?.map(s => s.ad_id) || []);
         const formattedAds: Ad[] = adsData.map(ad => ({
           ...ad,
@@ -176,7 +173,31 @@ export default function ProfileDashboard() {
     loadDashboardData();
   }, []);
 
-  // 💰 Máscara Monetária Automática para a Taxa de Entrega
+  // ⬆️ ⬇️ Função para reordenar produtos na vitrine/cardápio
+  const handleMoveOrder = async (index: number, direction: "up" | "down") => {
+    const targetIndex = direction === "up" ? index - 1 : index + 1;
+    if (targetIndex < 0 || targetIndex >= myAds.length) return;
+
+    const newAds = [...myAds];
+    const temp = newAds[index];
+    newAds[index] = newAds[targetIndex];
+    newAds[targetIndex] = temp;
+
+    const updates = newAds.map((ad, idx) => ({
+      id: ad.id,
+      display_order: idx,
+    }));
+
+    setMyAds(newAds);
+
+    for (const item of updates) {
+      await supabase
+        .from("ads")
+        .update({ display_order: item.display_order })
+        .eq("id", item.id);
+    }
+  };
+
   const handleDeliveryFeeChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const valueOnly = e.target.value.replace(/\D/g, "");
     if (!valueOnly) {
@@ -208,11 +229,9 @@ export default function ProfileDashboard() {
       alert("⚠️ Selecione pelo menos uma cidade ou marque a opção 'Todas as cidades'.");
       return;
     }
-
     setLoading(true);
     let uploadedLogoUrl = currentLogoUrl || "";
     let uploadedBannerUrl = bannerUrl || "";
-
     if (logoFile) {
       const fileExt = logoFile.name.split('.').pop();
       const fileName = `${user.id}-logo-${Math.random()}.${fileExt}`;
@@ -220,13 +239,11 @@ export default function ProfileDashboard() {
       const { error: uploadError } = await supabase.storage
         .from("ads-images")
         .upload(filePath, logoFile, { upsert: true });
-
       if (!uploadError) {
         const { data } = supabase.storage.from("ads-images").getPublicUrl(filePath);
         uploadedLogoUrl = data.publicUrl;
       }
     }
-
     if (bannerFile) {
       const fileExt = bannerFile.name.split('.').pop();
       const fileName = `${user.id}-banner-${Math.random()}.${fileExt}`;
@@ -234,21 +251,17 @@ export default function ProfileDashboard() {
       const { error: uploadError } = await supabase.storage
         .from("ads-images")
         .upload(filePath, bannerFile, { upsert: true });
-
       if (!uploadError) {
         const { data } = supabase.storage.from("ads-images").getPublicUrl(filePath);
         uploadedBannerUrl = data.publicUrl;
       }
     }
-
     const isClientUser = 
       user.email?.includes("@anunciante.com") || 
       user.email?.includes("phone_") || 
       user.email?.endsWith("@client.conectacidade.local") || 
       user.phone;
-
     const primaryCity = selectedCities[0] || city || "Rubiácea-SP";
-
     const profileData: any = {
       id: user.id,
       store_name: storeName,
@@ -258,7 +271,7 @@ export default function ProfileDashboard() {
       bio: bio,
       whatsapp: whatsapp,
       store_type: storeType,
-      delivery_fee: rawDeliveryFee || 0, // 👈 Salva a taxa de entrega no Supabase
+      delivery_fee: rawDeliveryFee || 0,
       logo_url: uploadedLogoUrl,
       theme_color: themeColor,
       font_style: fontStyle, 
@@ -267,10 +280,8 @@ export default function ProfileDashboard() {
       close_time: closeTime,
       user_type: isClientUser ? "client" : "store"
     };
-
     const { error } = await supabase.from("profiles").upsert(profileData);
     setLoading(false);
-
     if (error) {
       alert("Erro ao salvar dados: " + error.message);
     } else {
@@ -298,7 +309,6 @@ export default function ProfileDashboard() {
         { user_id: user.id, ad_id: adId, title: adTitle, sold_at: new Date().toISOString() }
       ]);
     } catch (e) {}
-
     const { error } = await supabase.from("ads").delete().eq("id", adId);
     if (!error) {
       setMyAds(myAds.filter(ad => ad.id !== adId));
@@ -311,11 +321,9 @@ export default function ProfileDashboard() {
   const handleToggleClassificados = async (adId: string, currentState: boolean) => {
     const newState = !currentState;
     const updatePayload: any = { show_in_classificados: newState };
-    
     if (newState) {
       updatePayload.created_at = new Date().toISOString();
     }
-
     const { error } = await supabase.from("ads").update(updatePayload).eq("id", adId);
     if (!error) {
       setMyAds(myAds.map(a => a.id === adId ? { ...a, show_in_classificados: newState, created_at: newState ? new Date().toISOString() : a.created_at } : a));
@@ -379,7 +387,6 @@ export default function ProfileDashboard() {
         >
           {"<"} Voltar para o Início
         </button>
-
         {userType === "store" && storeName && (
           <button 
             onClick={() => window.open(`/shop/${user?.id}`, "_blank")}
@@ -406,7 +413,6 @@ export default function ProfileDashboard() {
             >
               📋 Dados da Loja
             </button>
-            
             <button
               onClick={() => setActiveTab("vitrine")}
               style={{
@@ -419,7 +425,6 @@ export default function ProfileDashboard() {
             >
               🎨 Personalizar Vitrine
             </button>
-
             <button
               onClick={() => setActiveTab("anuncios")}
               style={{
@@ -450,7 +455,6 @@ export default function ProfileDashboard() {
                   style={{ width: "100%", padding: 12, border: "1px solid #CBD5E1", borderRadius: 6, fontSize: 14 }} 
                 />
               </div>
-
               <div>
                 <label style={{ display: "block", fontSize: 13, fontWeight: "bold", marginBottom: 6 }}>Modelo / Tipo de Vitrine:</label>
                 <select
@@ -463,7 +467,6 @@ export default function ProfileDashboard() {
                 </select>
               </div>
 
-              {/* 🏙️ SELETOR MÚLTIPLO DE CIDADES PARA A LOJA */}
               <div style={{ display: "flex", flexDirection: "column", gap: 8, backgroundColor: "#F8FAFC", padding: "14px", borderRadius: "8px", border: "1px solid #CBD5E1" }}>
                 <label style={{ fontSize: 14, fontWeight: "bold", color: "#1E293B" }}>📍 Cidades atendidas por este estabelecimento:</label>
                 
@@ -515,7 +518,6 @@ export default function ProfileDashboard() {
                 </div>
               </div>
 
-              {/* 🛵 CAMPO DA TAXA DE ENTREGA */}
               <div>
                 <label style={{ display: "block", fontSize: 13, fontWeight: "bold", marginBottom: 6 }}>Taxa de Entrega (R$):</label>
                 <input 
@@ -655,7 +657,7 @@ export default function ProfileDashboard() {
                   </h2>
                   <p style={{ color: "#64748B", margin: "4px 0 0 0", fontSize: 13 }}>
                     {userType === "store" 
-                      ? "Cadastre produtos na sua vitrine e escolha quais aparecem nos classificados gerais (Validade de 10 dias na home)." 
+                      ? "Cadastre produtos na sua vitrine, ordene quais aparecem primeiro e escolha quais vão para os classificados gerais." 
                       : "Gerencie seus anúncios publicados no site."}
                   </p>
                 </div>
@@ -675,34 +677,77 @@ export default function ProfileDashboard() {
                 </div>
               ) : (
                 <div style={{ display: "flex", flexDirection: "column", gap: 12 }}>
-                  {myAds.map((ad) => {
+                  {myAds.map((ad, index) => {
                     const createdTime = ad.created_at ? new Date(ad.created_at).getTime() : Date.now();
                     const diffDays = (Date.now() - createdTime) / (1000 * 60 * 60 * 24);
                     const isExpired = diffDays > 10;
                     const isClassificadosActive = ad.show_in_classificados === true;
 
                     return (
-                      <div key={ad.id} style={{ display: "flex", gap: 15, padding: 12, border: "1px solid #E2E8F0", borderRadius: 8, alignItems: "center", justifyContent: "space-between", flexWrap: "wrap", opacity: ad.is_hidden ? 0.6 : 1, backgroundColor: ad.is_hidden ? "#F8FAFC" : "#fff" }}>
-                        <div style={{ display: "flex", gap: 12, alignItems: "center", flex: 1, minWidth: 200 }}>
-                          {ad.image_url ? (
-                            <img src={ad.image_url} alt={ad.title} style={{ width: 55, height: 55, borderRadius: 6, objectFit: "cover" }} />
-                          ) : (
-                            <div style={{ width: 55, height: 55, borderRadius: 6, backgroundColor: "#F1F5F9", display: "flex", alignItems: "center", justifyContent: "center", fontSize: 10, color: "#94A3B8" }}>Sem foto</div>
-                          )}
-                          <div style={{ minWidth: 0 }}>
-                            <h4 style={{ margin: 0, fontSize: 14, fontWeight: "bold", color: "#1E293B", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
-                              {ad.title}
-                            </h4>
-                            <p style={{ margin: "3px 0 0 0", fontSize: 13, color: activeThemeHex, fontWeight: "bold" }}>
-                              {ad.price ? `R$ ${ad.price.toFixed(2)}` : "Valor a combinar"}
-                            </p>
-                            <span style={{ fontSize: 11, color: "#94A3B8" }}>
-                              » {ad.city} {ad.category} {isExpired && isClassificadosActive && <span style={{ color: "#DC2626", fontWeight: "bold" }}>Expirado da Home</span>}
-                            </span>
+                      <div key={ad.id} style={{ display: "flex", flexDirection: "column", gap: 10, padding: 12, border: "1px solid #E2E8F0", borderRadius: 8, opacity: ad.is_hidden ? 0.6 : 1, backgroundColor: ad.is_hidden ? "#F8FAFC" : "#fff" }}>
+                        
+                        <div style={{ display: "flex", gap: 15, alignItems: "center", justifyContent: "space-between", flexWrap: "wrap" }}>
+                          <div style={{ display: "flex", gap: 12, alignItems: "center", flex: 1, minWidth: 200 }}>
+                            {ad.image_url ? (
+                              <img src={ad.image_url} alt={ad.title} style={{ width: 55, height: 55, borderRadius: 6, objectFit: "cover" }} />
+                            ) : (
+                              <div style={{ width: 55, height: 55, borderRadius: 6, backgroundColor: "#F1F5F9", display: "flex", alignItems: "center", justifyContent: "center", fontSize: 10, color: "#94A3B8" }}>Sem foto</div>
+                            )}
+                            <div style={{ minWidth: 0 }}>
+                              <h4 style={{ margin: 0, fontSize: 15, fontWeight: "bold", color: "#1E293B", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
+                                #{index + 1} - {ad.title}
+                              </h4>
+                              <p style={{ margin: "3px 0 0 0", fontSize: 13, color: activeThemeHex, fontWeight: "bold" }}>
+                                {ad.price ? `R$ ${ad.price.toFixed(2)}` : "Valor a combinar"}
+                              </p>
+                              <span style={{ fontSize: 11, color: "#94A3B8" }}>
+                                » {ad.city} • {ad.category} {isExpired && isClassificadosActive && <span style={{ color: "#DC2626", fontWeight: "bold" }}>Expirado da Home</span>}
+                              </span>
+                            </div>
                           </div>
+
+                          {/* ⬆️ ⬇️ Botões de Ordenação rápida para o lojista */}
+                          {userType === "store" && (
+                            <div style={{ display: "flex", gap: 5 }}>
+                              <button
+                                onClick={() => handleMoveOrder(index, "up")}
+                                disabled={index === 0}
+                                title="Subir produto"
+                                style={{
+                                  backgroundColor: index === 0 ? "#CBD5E1" : activeThemeHex,
+                                  color: "#fff",
+                                  border: "none",
+                                  padding: "6px 10px",
+                                  borderRadius: 6,
+                                  cursor: index === 0 ? "not-allowed" : "pointer",
+                                  fontWeight: "bold",
+                                  fontSize: 12,
+                                }}
+                              >
+                                ⬆️ Subir
+                              </button>
+                              <button
+                                onClick={() => handleMoveOrder(index, "down")}
+                                disabled={index === myAds.length - 1}
+                                title="Descer produto"
+                                style={{
+                                  backgroundColor: index === myAds.length - 1 ? "#CBD5E1" : activeThemeHex,
+                                  color: "#fff",
+                                  border: "none",
+                                  padding: "6px 10px",
+                                  borderRadius: 6,
+                                  cursor: index === myAds.length - 1 ? "not-allowed" : "pointer",
+                                  fontWeight: "bold",
+                                  fontSize: 12,
+                                }}
+                              >
+                                ⬇️ Descer
+                              </button>
+                            </div>
+                          )}
                         </div>
 
-                        <div style={{ display: "flex", gap: 6, flexShrink: 0, marginTop: 8, flexWrap: "wrap", width: "100%", justifyContent: "flex-start" }}>
+                        <div style={{ display: "flex", gap: 6, flexShrink: 0, flexWrap: "wrap", width: "100%", justifyContent: "flex-start", borderTop: "1px solid #F1F5F9", paddingTop: 8 }}>
                           {userType === "store" ? (
                             <>
                               {isExpired && isClassificadosActive ? (
@@ -727,7 +772,6 @@ export default function ProfileDashboard() {
                                   📢 Anunciar nos Classificados
                                 </button>
                               )}
-
                               <button 
                                 onClick={() => handleToggleFeature(ad.id, !!ad.is_featured, ad.image_url)}
                                 style={{ padding: "8px 10px", backgroundColor: ad.is_featured ? "#FEF3C7" : "#10B981", color: ad.is_featured ? "#D97706" : "#fff", border: "none", borderRadius: 6, fontSize: 12, fontWeight: "bold", cursor: "pointer", flex: "1 1 auto" }}
@@ -757,14 +801,12 @@ export default function ProfileDashboard() {
                               </button>
                             </>
                           )}
-
                           <button 
                             onClick={() => window.location.href = `/edit-ad/${ad.id}`}
                             style={{ padding: "8px 12px", backgroundColor: "#E2E8F0", color: "#1E293B", border: "none", borderRadius: 6, fontSize: 12, fontWeight: "bold", cursor: "pointer", flex: "1 1 auto" }}
                           >
                             Editar
                           </button>
-
                           <button 
                             onClick={() => handleDeleteAd(ad.id, ad.title)}
                             style={{ padding: "8px 12px", backgroundColor: "#FEE2E2", color: "#DC2626", border: "none", borderRadius: 6, fontSize: 12, fontWeight: "bold", cursor: "pointer", flex: "1 1 auto" }}

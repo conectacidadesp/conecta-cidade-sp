@@ -23,8 +23,10 @@ export default function EditAdPage() {
   const [subcategory, setSubcategory] = useState("");
   const [whatsapp, setWhatsapp] = useState("");
   const [imageUrl, setImageUrl] = useState("");
+  const [imageFile, setImageFile] = useState<File | null>(null); // 📸 Estado para novo arquivo de foto selecionado
   
-  // 🏪 Estado para ocultar do feed principal (Classificados)
+  // 🏪 Estado para verificar se o usuário é lojista e ocultar do feed principal (Classificados)
+  const [isStoreOwner, setIsStoreOwner] = useState(false);
   const [hideInClassificados, setHideInClassificados] = useState(false);
   
   // 🏷️ Sugestões inteligentes de subcategorias já usadas pelo lojista
@@ -79,6 +81,24 @@ export default function EditAdPage() {
       setAllCities(data.all_cities || false);
       setSelectedCities(data.cities || (data.city ? [data.city] : ["Rubiácea-SP"]));
 
+      // 🔍 Verifica o perfil do usuário para saber se é Lojista ou Anunciante Comum
+      if (data.user_id) {
+        const { data: profileData } = await supabase
+          .from("profiles")
+          .select("user_type, store_name, name")
+          .eq("id", data.user_id)
+          .maybeSingle();
+
+        if (profileData) {
+          const sName = (profileData.store_name || profileData.name || "").toLowerCase();
+          const isRealStore =
+            profileData.user_type !== "client" &&
+            !sName.startsWith("anunciante") &&
+            sName.trim() !== "";
+          setIsStoreOwner(isRealStore);
+        }
+      }
+
       // 🔍 Busca subcategorias já cadastradas por este lojista para sugestão rápida
       const { data: userAds } = await supabase
         .from("ads")
@@ -120,6 +140,15 @@ export default function EditAdPage() {
     }
   };
 
+  // 📸 Seleção de foto da galeria/computador com pré-visualização imediata
+  const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (file) {
+      setImageFile(file);
+      setImageUrl(URL.createObjectURL(file));
+    }
+  };
+
   // Função para salvar as alterações no Supabase
   const handleUpdate = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -133,6 +162,30 @@ export default function EditAdPage() {
     // Se estiver marcado como "preço a combinar", salvamos o preço como null no banco
     const finalPrice = isPriceNegotiable ? null : rawPriceValue;
 
+    let finalImageUrl = imageUrl;
+
+    // 📤 Se o usuário escolheu uma nova imagem da galeria/computador, faz o upload no Supabase Storage
+    if (imageFile) {
+      const fileExt = imageFile.name.split(".").pop();
+      const fileName = `public/${Date.now()}-${Math.random().toString(36).substring(2)}.${fileExt}`;
+
+      const { error: uploadError } = await supabase.storage
+        .from("ads-images")
+        .upload(fileName, imageFile);
+
+      if (uploadError) {
+        alert("Erro ao enviar a nova foto: " + uploadError.message);
+        setSaving(false);
+        return;
+      }
+
+      const { data: publicUrlData } = supabase.storage
+        .from("ads-images")
+        .getPublicUrl(fileName);
+
+      finalImageUrl = publicUrlData.publicUrl;
+    }
+
     const { error } = await supabase
       .from("ads")
       .update({
@@ -140,13 +193,13 @@ export default function EditAdPage() {
         description,
         price: finalPrice,
         category,
-        subcategory: subcategory.trim() || null,
+        subcategory: isStoreOwner ? (subcategory.trim() || null) : null,
         whatsapp,
-        image_url: imageUrl,
+        image_url: finalImageUrl,
         city: primaryCity,
         cities: selectedCities,
         all_cities: allCities,
-        show_in_classificados: !hideInClassificados, 
+        show_in_classificados: isStoreOwner ? !hideInClassificados : true, 
       })
       .eq("id", adId);
 
@@ -246,47 +299,50 @@ export default function EditAdPage() {
           </div>
         </div>
 
-        {/* 🏷️ CATEGORIA DO CARDÁPIO COM SUGESTÕES INTELIGENTES */}
-        <div style={{ backgroundColor: "#FFF7ED", padding: 12, borderRadius: 8, border: "1px solid #FDBA74" }}>
-          <label style={{ display: "block", fontSize: 13, fontWeight: "bold", marginBottom: 5, color: "#9A3412" }}>Categoria no Cardápio / Subcategoria:</label>
-          <input
-            type="text"
-            value={subcategory}
-            onChange={(e) => setSubcategory(e.target.value)}
-            placeholder="Ex: Lanches, Bebidas, Pizzas..."
-            style={{ width: "100%", padding: "10px", borderRadius: 6, border: "1px solid #CBD5E1", fontSize: 14, backgroundColor: "#fff", boxSizing: "border-box" }}
-          />
-          {existingStoreSubcategories.length > 0 && (
-            <div style={{ marginTop: 6 }}>
-              <span style={{ fontSize: 11, color: "#9A3412", display: "block", marginBottom: 4 }}>Categorias existentes (clique para usar):</span>
-              <div style={{ display: "flex", gap: 6, flexWrap: "wrap" }}>
-                {existingStoreSubcategories.map((sub) => (
-                  <button
-                    key={sub}
-                    type="button"
-                    onClick={() => setSubcategory(sub)}
-                    style={{ background: "#EA580C", color: "#fff", border: "none", padding: "3px 8px", borderRadius: 10, fontSize: 11, cursor: "pointer", fontWeight: "bold" }}
-                  >
-                    + {sub}
-                  </button>
-                ))}
-              </div>
+        {/* 🏷️ CATEGORIA DO CARDÁPIO E OPÇÃO DE OCULTAR DO FEED (EXCLUSIVO PARA LOJISTAS) */}
+        {isStoreOwner && (
+          <>
+            <div style={{ backgroundColor: "#FFF7ED", padding: 12, borderRadius: 8, border: "1px solid #FDBA74" }}>
+              <label style={{ display: "block", fontSize: 13, fontWeight: "bold", marginBottom: 5, color: "#9A3412" }}>Categoria no Cardápio / Subcategoria:</label>
+              <input
+                type="text"
+                value={subcategory}
+                onChange={(e) => setSubcategory(e.target.value)}
+                placeholder="Ex: Lanches, Bebidas, Pizzas..."
+                style={{ width: "100%", padding: "10px", borderRadius: 6, border: "1px solid #CBD5E1", fontSize: 14, backgroundColor: "#fff", boxSizing: "border-box" }}
+              />
+              {existingStoreSubcategories.length > 0 && (
+                <div style={{ marginTop: 6 }}>
+                  <span style={{ fontSize: 11, color: "#9A3412", display: "block", marginBottom: 4 }}>Categorias existentes (clique para usar):</span>
+                  <div style={{ display: "flex", gap: 6, flexWrap: "wrap" }}>
+                    {existingStoreSubcategories.map((sub) => (
+                      <button
+                        key={sub}
+                        type="button"
+                        onClick={() => setSubcategory(sub)}
+                        style={{ background: "#EA580C", color: "#fff", border: "none", padding: "3px 8px", borderRadius: 10, fontSize: 11, cursor: "pointer", fontWeight: "bold" }}
+                      >
+                        + {sub}
+                      </button>
+                    ))}
+                  </div>
+                </div>
+              )}
             </div>
-          )}
-        </div>
 
-        {/* 🏪 OPÇÃO DE OCULTAR DO MARKETPLACE GERAL */}
-        <div style={{ backgroundColor: "#F1F5F9", padding: "12px 14px", borderRadius: 8, border: "1px solid #CBD5E1" }}>
-          <label style={{ display: "flex", alignItems: "center", gap: 8, fontSize: 14, fontWeight: "bold", color: "#0F4C81", cursor: "pointer" }}>
-            <input 
-              type="checkbox" 
-              checked={hideInClassificados} 
-              onChange={(e) => setHideInClassificados(e.target.checked)}
-              style={{ width: 16, height: 16, accentColor: "#0F4C81", cursor: "pointer" }}
-            />
-            📦 Ocultar do Feed Geral (Exibir apenas no Cardápio / Loja Virtual)
-          </label>
-        </div>
+            <div style={{ backgroundColor: "#F1F5F9", padding: "12px 14px", borderRadius: 8, border: "1px solid #CBD5E1" }}>
+              <label style={{ display: "flex", alignItems: "center", gap: 8, fontSize: 14, fontWeight: "bold", color: "#0F4C81", cursor: "pointer" }}>
+                <input 
+                  type="checkbox" 
+                  checked={hideInClassificados} 
+                  onChange={(e) => setHideInClassificados(e.target.checked)}
+                  style={{ width: 16, height: 16, accentColor: "#0F4C81", cursor: "pointer" }}
+                />
+                📦 Ocultar do Feed Geral (Exibir apenas no Cardápio / Loja Virtual)
+              </label>
+            </div>
+          </>
+        )}
 
         {/* 🏙️ SELETOR MÚLTIPLO DE CIDADES */}
         <div style={{ display: "flex", flexDirection: "column", gap: 8, backgroundColor: "#F8FAFC", padding: "14px", borderRadius: "8px", border: "1px solid #CBD5E1" }}>
@@ -327,15 +383,48 @@ export default function EditAdPage() {
             style={{ width: "100%", padding: "10px", borderRadius: 6, border: "1px solid #CBD5E1", fontSize: 14, boxSizing: "border-box" }}
           />
         </div>
-        <div>
-          <label style={{ display: "block", fontSize: 13, fontWeight: "bold", marginBottom: 5, color: "#334155" }}>URL da Imagem:</label>
-          <input
-            type="text"
-            value={imageUrl}
-            onChange={(e) => setImageUrl(e.target.value)}
-            style={{ width: "100%", padding: "10px", borderRadius: 6, border: "1px solid #CBD5E1", fontSize: 14, boxSizing: "border-box" }}
-          />
+
+        {/* 📸 SELETOR DE FOTO DA GALERIA / COMPUTADOR COM PRÉ-VISUALIZAÇÃO */}
+        <div style={{ backgroundColor: "#F8FAFC", padding: 14, borderRadius: 8, border: "1px solid #CBD5E1" }}>
+          <label style={{ display: "block", fontSize: 13, fontWeight: "bold", marginBottom: 8, color: "#334155" }}>📸 Foto do Anúncio:</label>
+          
+          {imageUrl && (
+            <div style={{ marginBottom: 12, textAlign: "center", backgroundColor: "#fff", padding: 10, borderRadius: 8, border: "1px solid #E2E8F0" }}>
+              <img
+                src={imageUrl}
+                alt="Pré-visualização do anúncio"
+                style={{ maxHeight: 180, maxWidth: "100%", objectFit: "contain", borderRadius: 6 }}
+              />
+            </div>
+          )}
+
+          <label
+            style={{
+              display: "inline-block",
+              padding: "10px 16px",
+              backgroundColor: "#0F4C81",
+              color: "#fff",
+              borderRadius: 6,
+              fontSize: 13,
+              fontWeight: "bold",
+              cursor: "pointer",
+            }}
+          >
+            📁 Escolher nova foto (Galeria ou Computador)
+            <input
+              type="file"
+              accept="image/*"
+              onChange={handleFileChange}
+              style={{ display: "none" }}
+            />
+          </label>
+          {imageFile && (
+            <span style={{ display: "block", fontSize: 12, color: "#16A34A", marginTop: 6, fontWeight: "bold" }}>
+              ✅ Nova foto selecionada: {imageFile.name}
+            </span>
+          )}
         </div>
+
         <div style={{ display: "flex", justifyContent: "flex-end", gap: 10, marginTop: 10 }}>
           <button
             type="button"

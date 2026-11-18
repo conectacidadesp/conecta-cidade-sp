@@ -1,3 +1,4 @@
+
 "use client";
 import { useEffect, useState, useRef, Suspense } from "react";
 import { useParams, useSearchParams } from "next/navigation";
@@ -14,6 +15,7 @@ interface Ad {
   category?: string | null;
   subcategory?: string | null;
   is_hidden?: boolean | null;
+  display_order?: number;
 }
 
 interface StoreProfile {
@@ -72,6 +74,14 @@ const FONT_FAMILIES: Record<string, string> = {
   cursive: "'Brush Script MT', 'Lucida Handwriting', cursive",
 };
 
+// 💵 Função para formatar o texto digitado no padrão monetário brasileiro (R$ 0,00)
+const formatCurrencyInput = (value: string) => {
+  const onlyDigits = value.replace(/\D/g, "");
+  if (!onlyDigits) return "";
+  const numberValue = parseFloat(onlyDigits) / 100;
+  return numberValue.toLocaleString("pt-BR", { style: "currency", currency: "BRL" });
+};
+
 function checkIsOpen(openTime?: string, closeTime?: string) {
   if (!openTime || !closeTime) return true;
   const now = new Date();
@@ -84,7 +94,7 @@ function checkIsOpen(openTime?: string, closeTime?: string) {
   const parts = formatter.formatToParts(now);
   const hours = parts.find((p) => p.type === "hour")?.value || "00";
   const minutes = parts.find((p) => p.type === "minute")?.value || "00";
-  
+
   const normalizedHours = hours === "24" ? "00" : hours.padStart(2, "0");
   const currentTime = `${normalizedHours}:${minutes.padStart(2, "0")}`;
   return currentTime >= openTime && currentTime <= closeTime;
@@ -95,14 +105,15 @@ function ShopContent() {
   const searchParams = useSearchParams();
   const rawId = params?.id as string;
   const targetAdQuery = searchParams.get("ad");
+
   const [ads, setAds] = useState<Ad[]>([]);
   const [profile, setProfile] = useState<StoreProfile | null>(null);
   const [highlightedAdId, setHighlightedAdId] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
-  
+
   const [selectedTabCategory, setSelectedTabCategory] = useState("Todos");
-  
-  // Estados do Carrinho & Endereço Estruturado
+
+  // Estados do Carrinho & Endereço
   const [cart, setCart] = useState<CartItem[]>([]);
   const [isCartOpen, setIsCartOpen] = useState(false);
   const [customerName, setCustomerName] = useState("");
@@ -111,7 +122,20 @@ function ShopContent() {
   const [neighborhood, setNeighborhood] = useState("");
   const [deliveryType, setDeliveryType] = useState<"delivery" | "pickup">("delivery");
   const [paymentMethod, setPaymentMethod] = useState("Pix");
+  const [changeFor, setChangeFor] = useState("");
   const [orderNotes, setOrderNotes] = useState("");
+  const [isSubmittingOrder, setIsSubmittingOrder] = useState(false);
+  const submittingOrderRef = useRef(false);
+  const lastRegisteredOrderRef = useRef<{
+    signature: string;
+    orderNumber: number;
+    printToken: string;
+    createdAt: string;
+    items: { title: string; qty: number; price: number | null }[];
+    subtotal: number;
+    deliveryFee: number;
+    total: number;
+  } | null>(null);
   const targetAdRef = useRef<HTMLDivElement | null>(null);
 
   useEffect(() => {
@@ -120,41 +144,42 @@ function ShopContent() {
       setLoading(true);
       let storeUserId = rawId;
       let adIdToHighlight = targetAdQuery;
-      
+
       const { data: directAd } = await supabase
         .from("ads")
         .select("*")
         .eq("id", rawId)
         .maybeSingle();
-        
+
       if (directAd) {
         storeUserId = directAd.user_id;
         adIdToHighlight = directAd.id;
       }
-      
+
       setHighlightedAdId(adIdToHighlight);
-      
+
       const { data: profileData, error: profileError } = await supabase
         .from("profiles")
         .select("*")
         .eq("id", storeUserId)
         .maybeSingle();
-        
+
       if (profileData && !profileError) {
         setProfile(profileData);
       }
-      
+
       const { data: adsData } = await supabase
         .from("ads")
         .select("*")
         .eq("user_id", storeUserId)
         .or("is_hidden.is.null,is_hidden.eq.false")
+        .order("display_order", { ascending: true, nullsFirst: false })
         .order("created_at", { ascending: false });
-        
+
       if (adsData) {
         setAds(adsData);
       }
-      
+
       setLoading(false);
       setTimeout(() => {
         if (targetAdRef.current) {
@@ -172,7 +197,7 @@ function ShopContent() {
     text: "#1E293B",
     accent: "#22C55E",
   };
-  
+
   const rawFontKey = profile?.font_style || "sans";
   const activeFontFamily = FONT_FAMILIES[rawFontKey] || FONT_FAMILIES.sans;
   const isFoodMode = profile?.store_type === "food";
@@ -190,7 +215,7 @@ function ShopContent() {
     });
   };
 
-  const removeFromCart = (adId: string) => {
+  const removeFromCard = (adId: string) => {
     setCart((prev) => prev.filter((item) => item.ad.id !== adId));
   };
 
@@ -213,44 +238,146 @@ function ShopContent() {
   const cartTotal = subtotal + deliveryFee;
   const totalItemsCount = cart.reduce((sum, item) => sum + item.quantity, 0);
 
-  const handleSendOrder = () => {
-    if (cart.length === 0) return;
-    const storeWhatsapp = ads[0]?.whatsapp || "";
-    const formattedPhone = storeWhatsapp.replace(/\D/g, "");
-    
-    let message = `🛒 *NOVO PEDIDO - ${profile?.store_name || "Delivery"}*\n`;
-    message += `*(Enviado via Conecta Cidade SP)*\n\n`;
-    message += `👤 *Cliente:* ${customerName.trim() ? customerName : "Não informado"}\n`;
-    message += `📦 *Modalidade:* ${deliveryType === "delivery" ? "🚚 Entrega em Domicílio" : "🏃 Retirada no Local"}\n`;
-    
-    if (deliveryType === "delivery") {
-      message += `📍 *Endereço:* ${street.trim() || "Não informada"}, Nº ${number.trim() || "S/N"}\n`;
-      if (neighborhood.trim()) {
-        message += `🏘️ *Bairro/Compl.:* ${neighborhood}\n`;
+  // Registra a comanda no Supabase antes de encaminhar o pedido ao WhatsApp.
+  const handleSendOrder = async () => {
+    if (submittingOrderRef.current || cart.length === 0 || !profile?.id) return;
+
+    const formattedPhone = (ads[0]?.whatsapp || "").replace(/\D/g, "");
+    if (!formattedPhone) {
+      alert("O estabelecimento não possui um WhatsApp cadastrado.");
+      return;
+    }
+
+    const finalPayment = paymentMethod === "Dinheiro (com troco)" && changeFor.trim()
+      ? `Dinheiro (Troco para ${changeFor})`
+      : paymentMethod;
+
+    const fullAddress = deliveryType === "delivery"
+      ? `${street.trim() || "Não informada"}, Nº ${number.trim() || "S/N"} ${neighborhood.trim() ? `- ${neighborhood.trim()}` : ""}`
+      : "";
+
+    const requestBody = {
+      storeId: profile.id,
+      customerName: customerName.trim(),
+      deliveryType,
+      address: fullAddress,
+      paymentMethod: finalPayment,
+      orderNotes: orderNotes.trim(),
+      items: cart.map((item) => ({ id: item.ad.id, quantity: item.quantity })),
+    };
+    const signature = JSON.stringify(requestBody);
+
+    submittingOrderRef.current = true;
+    setIsSubmittingOrder(true);
+
+    // Abre a guia durante o clique, antes do await, para evitar bloqueio de pop-up.
+    const whatsappWindow = window.open("about:blank", "_blank");
+
+    try {
+      let registeredOrder = lastRegisteredOrderRef.current;
+
+      if (!registeredOrder || registeredOrder.signature !== signature) {
+        const response = await fetch("/api/orders/create", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          cache: "no-store",
+          body: JSON.stringify(requestBody),
+        });
+
+        const result = await response.json();
+
+        if (!response.ok || !result?.success || !result?.order) {
+          throw new Error(result?.error || "Não foi possível registrar o pedido.");
+        }
+
+        const orderNumber = Number(result.order.order_number);
+        const printToken = String(result.order.print_token || "");
+        const createdAt = String(result.order.created_at || "");
+
+        if (!Number.isInteger(orderNumber) || orderNumber < 1 || !/^[a-f0-9]{48}$/.test(printToken)) {
+          throw new Error("O servidor retornou uma comanda inválida.");
+        }
+
+        registeredOrder = {
+          signature,
+          orderNumber,
+          printToken,
+          createdAt,
+          items: cart.map((item) => ({
+            title: item.ad.title,
+            qty: item.quantity,
+            price: item.ad.price,
+          })),
+          subtotal,
+          deliveryFee,
+          total: cartTotal,
+        };
+
+        lastRegisteredOrderRef.current = registeredOrder;
       }
+
+      const sequentialOrderNumber = `#${String(registeredOrder.orderNumber).padStart(2, "0")}`;
+      const date = registeredOrder.createdAt ? new Date(registeredOrder.createdAt) : new Date();
+      const formattedDate = date.toLocaleDateString("pt-BR", { timeZone: "America/Sao_Paulo" });
+      const formattedTime = date.toLocaleTimeString("pt-BR", {
+        timeZone: "America/Sao_Paulo",
+        hour12: false,
+      });
+      const printLink = `${window.location.origin}/print-order?token=${encodeURIComponent(registeredOrder.printToken)}`;
+
+      let message = `🛒 *PEDIDO ${sequentialOrderNumber} - ${profile.store_name || "Delivery"}*\n`;
+      message += `📅 *Data:* ${formattedDate} às ${formattedTime}\n`;
+      message += `*(Enviado via Conecta Cidade SP)*\n\n`;
+      message += `👤 *Cliente:* ${customerName.trim() || "Não informado"}\n`;
+      message += `📦 *Modalidade:* ${deliveryType === "delivery" ? "🚚 Entrega em Domicílio" : "🏃 Retirada no Local"}\n`;
+
+      if (deliveryType === "delivery") {
+        message += `📍 *Endereço:* ${street.trim() || "Não informada"}, Nº ${number.trim() || "S/N"}\n`;
+        if (neighborhood.trim()) {
+          message += `🏘️ *Bairro/Compl.:* ${neighborhood.trim()}\n`;
+        }
+      }
+
+      message += `💳 *Forma de Pagamento:* ${finalPayment}\n`;
+      if (orderNotes.trim()) {
+        message += `📝 *Observações:* ${orderNotes.trim()}\n`;
+      }
+
+      message += `\n📋 *ITENS DO PEDIDO:*\n`;
+
+      registeredOrder.items.forEach((item) => {
+        const itemPriceText = item.price !== null
+          ? `R$ ${(item.price * item.qty).toFixed(2)}`
+          : "A combinar";
+        message += `▪ ${item.qty}x ${item.title} — ${itemPriceText}\n`;
+      });
+
+      message += `\n------------------\n`;
+      message += `Subtotal: R$ ${registeredOrder.subtotal.toFixed(2)}\n`;
+
+      if (deliveryType === "delivery") {
+        message += `Taxa de Entrega: R$ ${registeredOrder.deliveryFee.toFixed(2)}\n`;
+      }
+
+      message += `💰 *TOTAL A PAGAR: R$ ${registeredOrder.total.toFixed(2)}*\n\n`;
+      message += `🖨️ *Imprimir Comanda:* ${printLink}`;
+
+      const waUrl = `https://wa.me/55${formattedPhone}?text=${encodeURIComponent(message)}`;
+
+      if (whatsappWindow && !whatsappWindow.closed) {
+        whatsappWindow.location.replace(waUrl);
+      } else {
+        window.location.assign(waUrl);
+      }
+    } catch (error) {
+      if (whatsappWindow && !whatsappWindow.closed) {
+        whatsappWindow.close();
+      }
+      alert(error instanceof Error ? error.message : "Erro ao registrar o pedido.");
+    } finally {
+      submittingOrderRef.current = false;
+      setIsSubmittingOrder(false);
     }
-    
-    message += `💳 *Forma de Pagamento:* ${paymentMethod}\n`;
-    if (orderNotes.trim()) {
-      message += `📝 *Observações:* ${orderNotes}\n`;
-    }
-    
-    message += `\n📋 *ITENS DO PEDIDO:*\n`;
-    cart.forEach((item) => {
-      const itemPriceText = item.ad.price !== null ? `R$ ${(item.ad.price * item.quantity).toFixed(2)}` : "A combinar";
-      message += `▪ ${item.quantity}x ${item.ad.title} — ${itemPriceText}\n`;
-    });
-    
-    message += `\n------------------\n`;
-    message += `Subtotal: R$ ${subtotal.toFixed(2)}\n`;
-    
-    if (deliveryType === "delivery") {
-      message += `Taxa de Entrega: R$ ${deliveryFee.toFixed(2)}\n`;
-    }
-    
-    message += `💰 *TOTAL A PAGAR: R$ ${cartTotal.toFixed(2)}*`;
-    const waUrl = `https://wa.me/55${formattedPhone}?text=${encodeURIComponent(message)}`;
-    window.open(waUrl, "_blank");
   };
 
   if (loading) {
@@ -267,9 +394,11 @@ function ShopContent() {
     return "Outros Produtos";
   };
 
-  const categoriesList = ["Todos", ...Array.from(new Set(ads.map(ad => getItemCategory(ad))))];
-  const filteredAds = selectedTabCategory === "Todos" 
-    ? ads 
+  const uniqueCategories = Array.from(new Set(ads.map(ad => getItemCategory(ad)))).sort((a, b) => a.localeCompare(b));
+  const categoriesList = ["Todos", ...uniqueCategories];
+
+  const filteredAds = selectedTabCategory === "Todos"
+    ? ads
     : ads.filter(ad => getItemCategory(ad) === selectedTabCategory);
 
   const groupedAds = filteredAds.reduce<Record<string, Ad[]>>((acc, ad) => {
@@ -321,13 +450,13 @@ function ShopContent() {
       )}
 
       <main style={{ maxWidth: "1200px", margin: "0 auto", padding: "0 20px" }}>
-        <div style={{ 
-          display: "flex", 
+        <div style={{
+          display: "flex",
           flexWrap: "wrap",
-          alignItems: "center", 
-          justifyContent: "space-between", 
+          alignItems: "center",
+          justifyContent: "space-between",
           gap: "15px",
-          marginBottom: "20px", 
+          marginBottom: "20px",
           backgroundColor: `${theme.primary}12`,
           border: `1px solid ${theme.primary}33`,
           borderRadius: "16px",
@@ -353,10 +482,10 @@ function ShopContent() {
                 {isFoodMode ? "🍔 Faça seu pedido online no nosso cardápio virtual!" : "Confira todo o nosso estoque virtual ativo abaixo"}
               </p>
               <div style={{ display: "flex", alignItems: "center", gap: 6, fontSize: 12, fontWeight: "bold", margin: "6px 0", padding: "3px 8px", backgroundColor: isOpen ? "#ECFDF5" : "#FEF2F2", borderRadius: 6, width: "fit-content" }}>
-                <span style={{ 
-                  width: 8, 
-                  height: 8, 
-                  borderRadius: "50%", 
+                <span style={{
+                  width: 8,
+                  height: 8,
+                  borderRadius: "50%",
                   backgroundColor: isOpen ? "#10B981" : "#EF4444",
                   display: "inline-block"
                 }} />
@@ -424,7 +553,7 @@ function ShopContent() {
                     const formattedPrice = ad.price !== null ? `R$ ${ad.price.toFixed(2)}` : "A combinar";
                     const imageText = ad.image_url ? ad.image_url : "";
                     const adLink = typeof window !== "undefined" ? `${window.location.origin}` : "";
-                    
+
                     const marketMessage = `🛍️ *Olá! Tenho interesse neste produto:*\n\n` +
                       `📦 *Produto:* ${ad.title}\n` +
                       `💰 *Preço:* ${formattedPrice}\n` +
@@ -503,15 +632,15 @@ function ShopContent() {
                               href={`https://wa.me/55${ad.whatsapp ? ad.whatsapp.replace(/\D/g, "") : ""}?text=${encodeURIComponent(marketMessage)}`}
                               target="_blank"
                               rel="noopener noreferrer"
-                              style={{ 
-                                display: "block", 
-                                textAlign: "center", 
-                                padding: "12px", 
-                                backgroundColor: "#22C55E", 
-                                color: "#fff", 
-                                borderRadius: "10px", 
-                                textDecoration: "none", 
-                                fontWeight: "bold", 
+                              style={{
+                                display: "block",
+                                textAlign: "center",
+                                padding: "12px",
+                                backgroundColor: "#22C55E",
+                                color: "#fff",
+                                borderRadius: "10px",
+                                textDecoration: "none",
+                                fontWeight: "bold",
                                 fontSize: "13px",
                                 boxShadow: "0 4px 12px rgba(34, 197, 94, 0.35)",
                                 transition: "all 0.2s ease"
@@ -559,13 +688,14 @@ function ShopContent() {
 
       {isCartOpen && (
         <div style={{ position: "fixed", top: 0, left: 0, width: "100vw", height: "100vh", backgroundColor: "rgba(0,0,0,0.6)", zIndex: 9999, display: "flex", justifyContent: "flex-end" }}>
-          <div style={{ width: "100%", maxWidth: "420px", backgroundColor: "#fff", height: "100%", padding: "20px", paddingBottom: "80px", display: "flex", flexDirection: "column", overflowY: "auto" }}>
-            <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", borderBottom: "1px solid #E2E8F0", paddingBottom: "15px" }}>
+          <div style={{ width: "100%", maxWidth: "420px", backgroundColor: "#fff", height: "100%", display: "flex", flexDirection: "column", position: "relative" }}>
+
+            <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", borderBottom: "1px solid #E2E8F0", padding: "20px" }}>
               <h2 style={{ fontSize: "20px", margin: 0, color: "#1E293B" }}>🛍️ Seu Pedido</h2>
               <button onClick={() => setIsCartOpen(false)} style={{ background: "none", border: "none", fontSize: "20px", cursor: "pointer" }}>✕</button>
             </div>
-            
-            <div style={{ marginTop: "20px", display: "flex", flexDirection: "column", gap: "15px" }}>
+
+            <div style={{ padding: "20px", overflowY: "auto", flex: 1, paddingBottom: "160px", display: "flex", flexDirection: "column", gap: "15px" }}>
               {cart.length === 0 ? (
                 <p style={{ color: "#64748B", textAlign: "center" }}>Seu carrinho está vazio.</p>
               ) : (
@@ -581,97 +711,110 @@ function ShopContent() {
                       <button onClick={() => updateQuantity(item.ad.id, -1)} style={{ width: "28px", height: "28px", borderRadius: "50%", border: "1px solid #CBD5E1", background: "#F8FAFC", cursor: "pointer", fontWeight: "bold" }}>-</button>
                       <span style={{ fontWeight: "bold", fontSize: "14px", color: "#1E293B" }}>{item.quantity}</span>
                       <button onClick={() => updateQuantity(item.ad.id, 1)} style={{ width: "28px", height: "28px", borderRadius: "50%", border: "1px solid #CBD5E1", background: "#F8FAFC", cursor: "pointer", fontWeight: "bold" }}>+</button>
-                      <button onClick={() => removeFromCart(item.ad.id)} style={{ background: "none", border: "none", color: "#EF4444", marginLeft: "4px", cursor: "pointer", fontSize: "16px" }} title="Remover item">🗑️</button>
+                      <button onClick={() => removeFromCard(item.ad.id)} style={{ background: "none", border: "none", color: "#EF4444", marginLeft: "4px", cursor: "pointer", fontSize: "16px" }} title="Remover item">🗑️</button>
                     </div>
                   </div>
                 ))
               )}
+
+              {cart.length > 0 && (
+                <div style={{ marginTop: "15px", display: "flex", flexDirection: "column", gap: "12px" }}>
+                  <h3 style={{ fontSize: "15px", margin: 0, color: "#1E293B" }}>📋 Dados da Entrega</h3>
+
+                  <div style={{ display: "flex", gap: "10px" }}>
+                    <button
+                      type="button"
+                      onClick={() => setDeliveryType("delivery")}
+                      style={{
+                        flex: 1, padding: "10px", borderRadius: "6px", fontSize: "13px", fontWeight: "bold", cursor: "pointer",
+                        border: deliveryType === "delivery" ? `2px solid ${theme.primary}` : "1px solid #CBD5E1",
+                        backgroundColor: deliveryType === "delivery" ? `${theme.primary}15` : "#fff",
+                        color: deliveryType === "delivery" ? theme.primary : "#64748B"
+                      }}
+                    >
+                      🚚 Entrega (+ R$ {(profile?.delivery_fee || 0).toFixed(2)})
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => setDeliveryType("pickup")}
+                      style={{
+                        flex: 1, padding: "10px", borderRadius: "6px", fontSize: "13px", fontWeight: "bold", cursor: "pointer",
+                        border: deliveryType === "pickup" ? `2px solid ${theme.primary}` : "1px solid #CBD5E1",
+                        backgroundColor: deliveryType === "pickup" ? `${theme.primary}15` : "#fff",
+                        color: deliveryType === "pickup" ? theme.primary : "#64748B"
+                      }}
+                    >
+                      🏃 Retirada (Grátis)
+                    </button>
+                  </div>
+
+                  <input type="text" placeholder="Seu Nome" value={customerName} onChange={(e) => setCustomerName(e.target.value)} style={{ width: "100%", padding: "10px", borderRadius: "6px", border: "1px solid #CBD5E1", fontSize: "13px", boxSizing: "border-box" }} />
+
+                  {deliveryType === "delivery" && (
+                    <>
+                      <div style={{ display: "flex", gap: "8px" }}>
+                        <input type="text" placeholder="Nome da Rua / Avenida" value={street} onChange={(e) => setStreet(e.target.value)} style={{ flex: 3, padding: "10px", borderRadius: "6px", border: "1px solid #CBD5E1", fontSize: "13px", boxSizing: "border-box" }} />
+                        <input type="text" placeholder="Nº" value={number} onChange={(e) => setNumber(e.target.value)} style={{ flex: 1, padding: "10px", borderRadius: "6px", border: "1px solid #CBD5E1", fontSize: "13px", boxSizing: "border-box" }} />
+                      </div>
+                      <input type="text" placeholder="Bairro / Complemento (Ex: Centro, Apto 24)" value={neighborhood} onChange={(e) => setNeighborhood(e.target.value)} style={{ width: "100%", padding: "10px", borderRadius: "6px", border: "1px solid #CBD5E1", fontSize: "13px", boxSizing: "border-box" }} />
+                    </>
+                  )}
+
+                  <select value={paymentMethod} onChange={(e) => setPaymentMethod(e.target.value)} style={{ width: "100%", padding: "10px", borderRadius: "6px", border: "1px solid #CBD5E1", fontSize: "13px", boxSizing: "border-box" }}>
+                    <option value="Pix">Pix</option>
+                    <option value="Cartão de Crédito/Débito">Cartão de Crédito/Débito</option>
+                    <option value="Dinheiro (com troco)">Dinheiro (com troco)</option>
+                  </select>
+
+                  {/* 💵 Campo de troco com máscara monetária padrão R$ 0,00 */}
+                  {paymentMethod === "Dinheiro (com troco)" && (
+                    <input
+                      type="text"
+                      placeholder="Troco para quanto? (Ex: R$ 50,00)"
+                      value={changeFor}
+                      onChange={(e) => setChangeFor(formatCurrencyInput(e.target.value))}
+                      style={{ width: "100%", padding: "10px", borderRadius: "6px", border: `2px solid ${theme.primary}`, fontSize: "13px", boxSizing: "border-box", backgroundColor: `${theme.primary}08`, fontWeight: "bold", color: theme.primary }}
+                    />
+                  )}
+
+                  <input type="text" placeholder="Observações (ex: tirar cebola)" value={orderNotes} onChange={(e) => setOrderNotes(e.target.value)} style={{ width: "100%", padding: "10px", borderRadius: "6px", border: "1px solid #CBD5E1", fontSize: "13px", boxSizing: "border-box" }} />
+                </div>
+              )}
             </div>
 
             {cart.length > 0 && (
-              <div style={{ marginTop: "25px", marginBottom: "30px", display: "flex", flexDirection: "column", gap: "12px" }}>
-                <h3 style={{ fontSize: "15px", margin: 0, color: "#1E293B" }}>📋 Dados da Entrega</h3>
-                
-                <div style={{ display: "flex", gap: "10px" }}>
-                  <button
-                    type="button"
-                    onClick={() => setDeliveryType("delivery")}
-                    style={{
-                      flex: 1, padding: "10px", borderRadius: "6px", fontSize: "13px", fontWeight: "bold", cursor: "pointer",
-                      border: deliveryType === "delivery" ? `2px solid ${theme.primary}` : "1px solid #CBD5E1",
-                      backgroundColor: deliveryType === "delivery" ? `${theme.primary}15` : "#fff",
-                      color: deliveryType === "delivery" ? theme.primary : "#64748B"
-                    }}
-                  >
-                    🚚 Entrega (+ R$ {(profile?.delivery_fee || 0).toFixed(2)})
-                  </button>
-                  <button
-                    type="button"
-                    onClick={() => setDeliveryType("pickup")}
-                    style={{
-                      flex: 1, padding: "10px", borderRadius: "6px", fontSize: "13px", fontWeight: "bold", cursor: "pointer",
-                      border: deliveryType === "pickup" ? `2px solid ${theme.primary}` : "1px solid #CBD5E1",
-                      backgroundColor: deliveryType === "pickup" ? `${theme.primary}15` : "#fff",
-                      color: deliveryType === "pickup" ? theme.primary : "#64748B"
-                    }}
-                  >
-                    🏃 Retirada (Grátis)
-                  </button>
-                </div>
-                
-                <input type="text" placeholder="Seu Nome" value={customerName} onChange={(e) => setCustomerName(e.target.value)} style={{ width: "100%", padding: "10px", borderRadius: "6px", border: "1px solid #CBD5E1", fontSize: "13px", boxSizing: "border-box" }} />
-                
-                {deliveryType === "delivery" && (
-                  <>
-                    <div style={{ display: "flex", gap: "8px" }}>
-                      <input type="text" placeholder="Nome da Rua / Avenida" value={street} onChange={(e) => setStreet(e.target.value)} style={{ flex: 3, padding: "10px", borderRadius: "6px", border: "1px solid #CBD5E1", fontSize: "13px", boxSizing: "border-box" }} />
-                      <input type="text" placeholder="Nº" value={number} onChange={(e) => setNumber(e.target.value)} style={{ flex: 1, padding: "10px", borderRadius: "6px", border: "1px solid #CBD5E1", fontSize: "13px", boxSizing: "border-box" }} />
-                    </div>
-                    <input type="text" placeholder="Bairro / Complemento (Ex: Centro, Apto 24)" value={neighborhood} onChange={(e) => setNeighborhood(e.target.value)} style={{ width: "100%", padding: "10px", borderRadius: "6px", border: "1px solid #CBD5E1", fontSize: "13px", boxSizing: "border-box" }} />
-                  </>
-                )}
-                
-                <select value={paymentMethod} onChange={(e) => setPaymentMethod(e.target.value)} style={{ width: "100%", padding: "10px", borderRadius: "6px", border: "1px solid #CBD5E1", fontSize: "13px", boxSizing: "border-box" }}>
-                  <option value="Pix">Pix</option>
-                  <option value="Cartão de Crédito/Débito">Cartão de Crédito/Débito</option>
-                  <option value="Dinheiro (com troco)">Dinheiro</option>
-                </select>
-                
-                <input type="text" placeholder="Observações (ex: tirar cebola)" value={orderNotes} onChange={(e) => setOrderNotes(e.target.value)} style={{ width: "100%", padding: "10px", borderRadius: "6px", border: "1px solid #CBD5E1", fontSize: "13px", boxSizing: "border-box" }} />
-              </div>
-            )}
-
-            {cart.length > 0 && (
-              <div style={{ borderTop: "2px solid #E2E8F0", paddingTop: "15px", marginTop: "auto", paddingBottom: "25px", backgroundColor: "#fff" }}>
-                <div style={{ display: "flex", justifyContent: "space-between", marginBottom: "6px", fontSize: "14px", color: "#64748B" }}>
+              <div style={{ position: "absolute", bottom: 0, left: 0, width: "100%", borderTop: "2px solid #E2E8F0", padding: "15px 20px", backgroundColor: "#fff", boxSizing: "border-box", boxShadow: "0 -4px 10px rgba(0,0,0,0.05)" }}>
+                <div style={{ display: "flex", justifyContent: "space-between", marginBottom: "4px", fontSize: "13px", color: "#64748B" }}>
                   <span>Subtotal:</span>
                   <span>R$ {subtotal.toFixed(2)}</span>
                 </div>
                 {deliveryType === "delivery" && (
-                  <div style={{ display: "flex", justifyContent: "space-between", marginBottom: "6px", fontSize: "14px", color: "#64748B" }}>
+                  <div style={{ display: "flex", justifyContent: "space-between", marginBottom: "4px", fontSize: "13px", color: "#64748B" }}>
                     <span>Taxa de Entrega:</span>
                     <span>R$ {deliveryFee.toFixed(2)}</span>
                   </div>
                 )}
-                <div style={{ display: "flex", justifyContent: "space-between", marginBottom: "12px", fontSize: "18px", fontWeight: "bold", color: "#1E293B", borderTop: "1px dashed #CBD5E1", paddingTop: "8px" }}>
+                <div style={{ display: "flex", justifyContent: "space-between", marginBottom: "10px", fontSize: "16px", fontWeight: "bold", color: "#1E293B", borderTop: "1px dashed #CBD5E1", paddingTop: "6px" }}>
                   <span>Total:</span>
                   <span style={{ color: theme.primary }}>R$ {cartTotal.toFixed(2)}</span>
                 </div>
                 <button
                   onClick={handleSendOrder}
+                  disabled={isSubmittingOrder}
                   style={{
                     width: "100%",
-                    padding: "14px",
+                    padding: "12px",
                     backgroundColor: "#22C55E",
                     color: "#fff",
                     border: "none",
                     borderRadius: "8px",
                     fontWeight: "bold",
                     fontSize: "15px",
-                    cursor: "pointer",
+                    cursor: isSubmittingOrder ? "wait" : "pointer",
+                    opacity: isSubmittingOrder ? 0.7 : 1,
                   }}
                 >
-                  💬 Finalizar Pedido no WhatsApp
+                  {isSubmittingOrder ? "⏳ Registrando pedido..." : "💬 Finalizar Pedido no WhatsApp"}
                 </button>
               </div>
             )}

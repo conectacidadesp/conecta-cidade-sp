@@ -9,8 +9,12 @@ const CITIES_LIST = [
   "Guararapes-SP",
 ];
 
-// 📂 Dicionário de Categorias e Subcategorias Atualizado
+// 📂 Dicionário de Categorias e Subcategorias Otimizado para o Dia a Dia
 const categoriesData: Record<string, { icon: string; subs: string[] }> = {
+  "Produtos Gerais": {
+    icon: "🛍️",
+    subs: ["Eletrodomésticos e Utilidades (Pipoqueira, Micro-ondas, etc.)", "Eletrônicos, Celulares e Informática", "Roupas, Calçados e Acessórios", "Móveis, Casa e Decoração", "Ferramentas e Materiais de Construção"]
+  },
   "Imóveis": {
     icon: "🏠",
     subs: ["Venda de Imóveis", "Aluguel Residencial", "Aluguel Comercial", "Temporada e Chácaras", "Terrenos e Lotes"]
@@ -30,10 +34,6 @@ const categoriesData: Record<string, { icon: string; subs: string[] }> = {
   "Alimentação": {
     icon: "🍕", 
     subs: ["Restaurantes e Marmitas", "Lanches e Pizzarias", "Açaí, Sorveterias, Doces e Bolos", "Bebidas e Distribuidoras"]
-  },
-  "Comércio e Lojas (Produtos)": {
-    icon: "🛍️",
-    subs: ["Eletrônicos e Celulares", "Roupas, Calçados e Acessórios", "Móveis, Casa e Decoração", "Ferramentas e Materiais de Construção"]
   },
   "Infantil e Brinquedos": {
     icon: "🧸", 
@@ -114,13 +114,14 @@ export default function CreateAd() {
   const [whatsapp, setWhatsapp] = useState("");
   const [customAdvertiserName, setCustomAdvertiserName] = useState(""); 
   const [imageFile, setImageFile] = useState<File | null>(null);
+  const [previewImageUrl, setPreviewImageUrl] = useState<string | null>(null); // 📸 Pré-visualização da imagem
   const [loading, setLoading] = useState(false);
   const [checkingAuth, setCheckingAuth] = useState(true);
   
   // 🏪 Novo estado: Exibir apenas no cardápio / Ocultar do marketplace geral
   const [hideInClassificados, setHideInClassificados] = useState(false);
   
-  // 🏷️ Sugestões inteligentes de subcategorias já usadas pelo lojista
+  // 🏷️ Sugestões inteligentes de subcategorias já usadas
   const [existingStoreSubcategories, setExistingStoreSubcategories] = useState<string[]>([]);
   // 🏙️ Estados para Multi-Cidades
   const [selectedCities, setSelectedCities] = useState<string[]>([]);
@@ -177,7 +178,7 @@ export default function CreateAd() {
         }
       }
 
-      // 🔍 Busca subcategorias já cadastradas por este lojista para sugestão rápida
+      // 🔍 Busca subcategorias já cadastradas por este usuário para sugestão rápida
       const { data: userAds } = await supabase
         .from("ads")
         .select("subcategory")
@@ -241,6 +242,15 @@ export default function CreateAd() {
       setSelectedCities(selectedCities.filter((c) => c !== cityName));
     } else {
       setSelectedCities([...selectedCities, cityName]);
+    }
+  };
+
+  // 📸 Manipulador para seleção de foto da galeria ou computador com pré-visualização
+  const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (file) {
+      setImageFile(file);
+      setPreviewImageUrl(URL.createObjectURL(file));
     }
   };
 
@@ -312,7 +322,7 @@ export default function CreateAd() {
         description,
         price: finalPrice,
         category: category || "Outros",
-        subcategory: subcategory || null,
+        subcategory: subcategory.trim() || null,
         custom_category: customCategoryValue,
         whatsapp: finalWhatsapp,
         city: primaryCity,
@@ -321,7 +331,7 @@ export default function CreateAd() {
         image_url: uploadedImageUrl || null,
         user_id: loggedUserId,
         advertiser_name: isAnuncianteComum ? (customAdvertiserName.trim() || null) : null,
-        show_in_classificados: !hideInClassificados, 
+        show_in_classificados: userType === "store" ? !hideInClassificados : true, 
       },
     ]);
 
@@ -457,21 +467,23 @@ export default function CreateAd() {
                 )}
               </div>
               
-              {/* 🏪 OPÇÃO DE EXIBIR NO MARKETPLACE */}
-              <div style={{ backgroundColor: "#F1F5F9", padding: "12px 14px", borderRadius: 8, border: "1px solid #CBD5E1" }}>
-                <label style={{ display: "flex", alignItems: "center", gap: 8, fontSize: 14, fontWeight: "bold", color: "#0F4C81", cursor: "pointer" }}>
-                  <input 
-                    type="checkbox" 
-                    checked={hideInClassificados} 
-                    onChange={(e) => setHideInClassificados(e.target.checked)}
-                    style={{ width: 16, height: 16, accentColor: "#0F4C81", cursor: "pointer" }}
-                  />
-                  📦 Ocultar do Feed Geral (Exibir apenas no Cardápio / Loja Virtual)
-                </label>
-                <span style={{ fontSize: 11, color: "#64748B", display: "block", marginTop: 4, marginLeft: 24 }}>
-                  Ideal para itens de cardápio (bebidas, adicionais, etc.) que não precisam poluir o classificados geral.
-                </span>
-              </div>
+              {/* 🏪 OPÇÃO DE EXIBIR NO MARKETPLACE (EXCLUSIVO PARA LOJISTAS) */}
+              {userType === "store" && (
+                <div style={{ backgroundColor: "#F1F5F9", padding: "12px 14px", borderRadius: 8, border: "1px solid #CBD5E1" }}>
+                  <label style={{ display: "flex", alignItems: "center", gap: 8, fontSize: 14, fontWeight: "bold", color: "#0F4C81", cursor: "pointer" }}>
+                    <input 
+                      type="checkbox" 
+                      checked={hideInClassificados} 
+                      onChange={(e) => setHideInClassificados(e.target.checked)}
+                      style={{ width: 16, height: 16, accentColor: "#0F4C81", cursor: "pointer" }}
+                    />
+                    📦 Ocultar do Feed Geral (Exibir apenas no Cardápio / Loja Virtual)
+                  </label>
+                  <span style={{ fontSize: 11, color: "#64748B", display: "block", marginTop: 4, marginLeft: 24 }}>
+                    Ideal para itens de cardápio (bebidas, adicionais, etc.) que não precisam poluir o classificados geral.
+                  </span>
+                </div>
+              )}
 
               {/* 🏙️ SELETOR DE CIDADES */}
               <div style={{ display: "flex", flexDirection: "column", gap: 8, backgroundColor: "#F8FAFC", padding: "14px", borderRadius: "8px", border: "1px solid #CBD5E1" }}>
@@ -544,15 +556,34 @@ export default function CreateAd() {
                   )}
                 </div>
               ) : (
-                category && categoriesData[category]?.subs.length > 0 && (
-                  <div style={{ display: "flex", flexDirection: "column", gap: 5 }}>
-                    <label style={{ fontSize: 14, fontWeight: "bold", color: "#1E293B" }}>📂 Subcategoria:</label>
-                    <select value={subcategory} onChange={(e) => setSubcategory(e.target.value)} required style={{ padding: 12, border: "1px solid #CBD5E1", borderRadius: 6, fontSize: 15, backgroundColor: "#fff", cursor: "pointer", width: "100%", boxSizing: "border-box" }}>
-                      <option value="">-- Escolha uma subcategoria --</option>
-                      {categoriesData[category].subs.map((sub) => (
-                        <option key={sub} value={sub}>🔹 {sub}</option>
-                      ))}
-                    </select>
+                category && (
+                  <div style={{ display: "flex", flexDirection: "column", gap: 6, backgroundColor: "#F8FAFC", padding: 12, borderRadius: 8, border: "1px solid #CBD5E1" }}>
+                    <label style={{ fontSize: 14, fontWeight: "bold", color: "#1E293B" }}>📂 Subcategoria (Escolha abaixo ou digite a sua própria):</label>
+                    <input
+                      type="text"
+                      placeholder="Digite a subcategoria ou escolha nas sugestões abaixo..."
+                      value={subcategory}
+                      onChange={(e) => setSubcategory(e.target.value)}
+                      required
+                      style={{ padding: 10, border: "1px solid #CBD5E1", borderRadius: 6, fontSize: 14, width: "100%", boxSizing: "border-box", backgroundColor: "#fff" }}
+                    />
+                    {categoriesData[category]?.subs.length > 0 && (
+                      <div>
+                        <span style={{ fontSize: 11, color: "#64748B", display: "block", marginBottom: 4 }}>Sugestões (clique para usar):</span>
+                        <div style={{ display: "flex", gap: 6, flexWrap: "wrap" }}>
+                          {categoriesData[category].subs.map((sub) => (
+                            <button
+                              key={sub}
+                              type="button"
+                              onClick={() => setSubcategory(sub)}
+                              style={{ background: "#0F4C81", color: "#fff", border: "none", padding: "4px 10px", borderRadius: 12, fontSize: 11, cursor: "pointer", fontWeight: "bold" }}
+                            >
+                              + {sub}
+                            </button>
+                          ))}
+                        </div>
+                      </div>
+                    )}
                   </div>
                 )
               )}
@@ -565,9 +596,45 @@ export default function CreateAd() {
                 style={{ padding: 12, border: "1px solid #CBD5E1", borderRadius: 6, fontSize: 15, width: "100%", boxSizing: "border-box" }} 
               />
               
-              <div style={{ display: "flex", flexDirection: "column", gap: 5 }}>
-                <label style={{ fontSize: 14, fontWeight: "bold", color: "#1E293B" }}>📸 Foto do Produto (Opcional):</label>
-                <input type="file" accept="image/*" onChange={(e) => e.target.files && setImageFile(e.target.files[0])} style={{ fontSize: 14, cursor: "pointer", width: "100%", boxSizing: "border-box" }} />
+              {/* 📸 SELETOR DE FOTO COM PRÉ-VISUALIZAÇÃO (PADRÃO IDÊNTICO À EDIÇÃO) */}
+              <div style={{ backgroundColor: "#F8FAFC", padding: 14, borderRadius: 8, border: "1px solid #CBD5E1" }}>
+                <label style={{ display: "block", fontSize: 13, fontWeight: "bold", marginBottom: 8, color: "#334155" }}>📸 Foto do Produto (Opcional):</label>
+                
+                {previewImageUrl && (
+                  <div style={{ marginBottom: 12, textAlign: "center", backgroundColor: "#fff", padding: 10, borderRadius: 8, border: "1px solid #E2E8F0" }}>
+                    <img
+                      src={previewImageUrl}
+                      alt="Pré-visualização da foto"
+                      style={{ maxHeight: 180, maxWidth: "100%", objectFit: "contain", borderRadius: 6 }}
+                    />
+                  </div>
+                )}
+
+                <label
+                  style={{
+                    display: "inline-block",
+                    padding: "10px 16px",
+                    backgroundColor: "#0F4C81",
+                    color: "#fff",
+                    borderRadius: 6,
+                    fontSize: 13,
+                    fontWeight: "bold",
+                    cursor: "pointer",
+                  }}
+                >
+                  📁 Escolher foto (Galeria ou Computador)
+                  <input
+                    type="file"
+                    accept="image/*"
+                    onChange={handleFileChange}
+                    style={{ display: "none" }}
+                  />
+                </label>
+                {imageFile && (
+                  <span style={{ display: "block", fontSize: 12, color: "#16A34A", marginTop: 6, fontWeight: "bold" }}>
+                    ✅ Foto selecionada: {imageFile.name}
+                  </span>
+                )}
               </div>
 
               <button type="submit" disabled={loading} style={{ padding: 14, backgroundColor: "#0F4C81", color: "white", border: "none", borderRadius: 6, fontSize: 16, fontWeight: "bold", cursor: "pointer", marginTop: 10, width: "100%" }}>

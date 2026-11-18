@@ -66,6 +66,9 @@ export default function Home() {
   
   // 🔍 Estado para visualização de imagem em tela cheia (Zoom)
   const [previewImage, setPreviewImage] = useState<string | null>(null);
+  
+  // 📖 Estado para controlar descrições expandidas no feed
+  const [expandedDescriptions, setExpandedDescriptions] = useState<{ [key: string]: boolean }>({});
 
   useEffect(() => {
     if (typeof window !== "undefined") {
@@ -314,13 +317,24 @@ export default function Home() {
   const renderAdCard = (ad: Ad) => {
     const storeProfile = ad.user_id ? profilesMap[ad.user_id] : null;
     const storeNameRaw = storeProfile ? storeProfile.store_name || storeProfile.name || "" : "";
+    
     const isRealStore =
       storeProfile &&
       storeProfile.user_type !== "client" &&
-      !storeNameRaw.toLowerCase().startsWith("anunciante");
+      !storeNameRaw.toLowerCase().startsWith("anunciante") &&
+      storeNameRaw.trim() !== "";
+      
     const storeName = isRealStore ? storeNameRaw : null;
     const isFoodStore = storeProfile?.store_type === "food";
-    const hasCustomAdvertiser = !storeName && ad.advertiser_name && ad.advertiser_name.trim() !== "";
+    
+    // 👤 Pega o advertiser_name ou o nome do perfil de usuário comum / cliente
+    const hasCustomAdvertiser = ad.advertiser_name && ad.advertiser_name.trim() !== "";
+    const clientUserName = storeProfile && storeProfile.name ? storeProfile.name : "";
+    
+    const commonAdvertiserName = hasCustomAdvertiser 
+      ? ad.advertiser_name 
+      : (!storeName && clientUserName ? clientUserName : null);
+
     const formattedPrice = ad.price ? `R$ ${ad.price.toFixed(2)}` : "A combinar";
     const imageText = ad.image_url ? `${ad.image_url}` : "Nenhuma foto informada";
     const adLink = typeof window !== "undefined" ? `${window.location.origin}` : "";
@@ -330,6 +344,14 @@ export default function Home() {
 📝 Detalhes: ${ad.description}
 🖼️ Foto do produto: ${imageText}
 🔗 Ver anúncio: ${adLink}`;
+
+    // 📖 Limite de caracteres para descrição no feed
+    const MAX_DESC_LENGTH = 65;
+    const isExpanded = expandedDescriptions[ad.id] || false;
+    const hasLongDescription = ad.description && ad.description.length > MAX_DESC_LENGTH;
+    const displayDescription = !isExpanded && hasLongDescription 
+      ? ad.description.substring(0, MAX_DESC_LENGTH) + "..." 
+      : ad.description;
 
     return (
       <div
@@ -344,7 +366,7 @@ export default function Home() {
           boxShadow: "0 10px 25px -5px rgba(0, 0, 0, 0.05), 0 8px 10px -6px rgba(0, 0, 0, 0.05)",
         }}
       >
-        {storeName && ad.user_id && (
+        {storeName && ad.user_id && !commonAdvertiserName && (
           <a
             href={`/shop/${ad.user_id}`}
             style={{
@@ -364,13 +386,13 @@ export default function Home() {
             <span style={{ fontSize: 13, fontWeight: "bold", color: "#FFFFFF" }}>🏪 {storeName}</span>
           </a>
         )}
-        {hasCustomAdvertiser && (
+        {commonAdvertiserName && (
           <div
             style={{
               backgroundColor: "#FFFFFF",
               padding: "8px 10px",
               textAlign: "center",
-              borderBottom: "1px solid #E2E8F0",
+              borderBottom: "2px solid #F97316",
               width: "100%",
               boxSizing: "border-box",
               display: "flex",
@@ -379,7 +401,7 @@ export default function Home() {
               gap: 6,
             }}
           >
-            <span style={{ fontSize: 13, fontWeight: "bold", color: "#000000" }}>👤 {ad.advertiser_name}</span>
+            <span style={{ fontSize: 13, fontWeight: "bold", color: "#000000" }}>👤 {commonAdvertiserName}</span>
           </div>
         )}
         {/* 🌟 ESTILO PROFISSIONAL MERCADO LIVRE (Fundo Branco + contain para zero cortes) */}
@@ -417,7 +439,17 @@ export default function Home() {
               {ad.category}
             </span>
             <h4 style={{ fontSize: 14, margin: "8px 0 4px", color: "#0B2545", fontWeight: "bold", lineHeight: "1.2" }}>{ad.title}</h4>
-            <p style={{ fontSize: 12, color: "#64748B", margin: "0 0 8px 0", lineHeight: "1.3", wordBreak: "break-word" }}>{ad.description}</p>
+            <p style={{ fontSize: 12, color: "#64748B", margin: "0 0 4px 0", lineHeight: "1.3", wordBreak: "break-word" }}>
+              {displayDescription}
+            </p>
+            {hasLongDescription && (
+              <button
+                onClick={() => setExpandedDescriptions(prev => ({ ...prev, [ad.id]: !isExpanded }))}
+                style={{ background: "none", border: "none", color: "#0088FF", fontSize: 11, fontWeight: "bold", cursor: "pointer", padding: 0, marginBottom: 8 }}
+              >
+                {isExpanded ? "▲ Ver menos" : "▼ Ver mais"}
+              </button>
+            )}
           </div>
           <div style={{ marginTop: 10 }}>
             <p style={{ fontSize: 16, fontWeight: "bold", color: "#0088FF", margin: "0 0 8px" }}>{formattedPrice}</p>
