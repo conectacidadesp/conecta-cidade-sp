@@ -1,5 +1,4 @@
 "use client";
-
 import { useState, useEffect } from "react";
 import { supabase } from "@/lib/supabase";
 
@@ -9,8 +8,8 @@ export default function Register() {
   // Estados para Loja
   const [storeForm, setStoreForm] = useState({ name: "", email: "", password: "", whatsapp: "" });
   
-  // Estados para Anunciante
-  const [advertiserForm, setAdvertiserForm] = useState({ phone: "", password: "" });
+  // Estados para Anunciante / Cliente (Agora com Nome, E-mail real, WhatsApp obrigatório e Senha)
+  const [advertiserForm, setAdvertiserForm] = useState({ name: "", email: "", whatsapp: "", password: "" });
   
   const [loading, setLoading] = useState(false);
 
@@ -40,23 +39,21 @@ export default function Register() {
   // ⏱️ Rotação automática dos banners a cada 5 segundos
   useEffect(() => {
     if (affiliateProducts.length <= 1) return;
-
     const interval = setInterval(() => {
       setLeftIndex((prev) => (prev + 1) % affiliateProducts.length);
       setRightIndex((prev) => (prev - 1 + affiliateProducts.length) % affiliateProducts.length);
       setMobileIndex((prev) => (prev + 1) % affiliateProducts.length);
     }, 5000);
-
     return () => clearInterval(interval);
   }, [affiliateProducts.length]);
 
-  // Cadastro de Loja
+  // Cadastro de Loja -> Grava user_type: "store"
   async function handleStoreRegister(e: React.FormEvent) {
     e.preventDefault();
     setLoading(true);
 
     const { data, error: authError } = await supabase.auth.signUp({
-      email: storeForm.email,
+      email: storeForm.email.trim(),
       password: storeForm.password,
     });
 
@@ -68,36 +65,37 @@ export default function Register() {
 
     if (data.user) {
       const savedCity = localStorage.getItem("selectedCity") || "Não informada";
+      const initialCities = savedCity !== "Não informada" ? [savedCity] : [];
       
       const { error: profileError } = await supabase.from("profiles").insert([
         { 
           id: data.user.id, 
-          name: storeForm.name,
-          store_name: storeForm.name,
-          whatsapp: storeForm.whatsapp, 
-          city: savedCity 
+          name: storeForm.name.trim(),
+          store_name: storeForm.name.trim(),
+          whatsapp: storeForm.whatsapp.replace(/\D/g, ""), 
+          city: savedCity,
+          cities: initialCities,
+          user_type: "store"
         }
       ]);
 
       if (profileError) {
         alert("Conta criada, mas houve um erro ao salvar o perfil: " + profileError.message);
       } else {
-        alert("Conta e perfil criados com sucesso!");
+        alert("Conta da loja criada com sucesso! Verifique seu e-mail se necessário e faça login.");
         window.location.href = "/login";
       }
     }
     setLoading(false);
   }
 
-  // Cadastro de Anunciante
+  // Cadastro de Anunciante / Cliente -> Grava user_type: "client"
   async function handleAdvertiserRegister(e: React.FormEvent) {
     e.preventDefault();
     setLoading(true);
 
-    const fakeEmail = `${advertiserForm.phone.replace(/\D/g, "")}@anunciante.com`;
-
     const { data, error: authError } = await supabase.auth.signUp({
-      email: fakeEmail,
+      email: advertiserForm.email.trim(),
       password: advertiserForm.password,
     });
 
@@ -109,21 +107,26 @@ export default function Register() {
 
     if (data.user) {
       const savedCity = localStorage.getItem("selectedCity") || "Não informada";
+      const initialCities = savedCity !== "Não informada" ? [savedCity] : [];
+      const cleanPhone = advertiserForm.whatsapp.replace(/\D/g, "");
+      const displayName = advertiserForm.name.trim() || `Anunciante ${cleanPhone}`;
       
       const { error: profileError } = await supabase.from("profiles").insert([
         { 
           id: data.user.id, 
-          name: `Anunciante ${advertiserForm.phone}`,
-          store_name: `Anunciante ${advertiserForm.phone}`,
-          whatsapp: advertiserForm.phone, 
-          city: savedCity 
+          name: displayName,
+          store_name: displayName,
+          whatsapp: cleanPhone, 
+          city: savedCity,
+          cities: initialCities,
+          user_type: "client"
         }
       ]);
 
       if (profileError) {
         alert("Conta criada, mas houve um erro ao salvar o perfil: " + profileError.message);
       } else {
-        alert("Conta de anunciante criada com sucesso!");
+        alert("Conta de anunciante criada com sucesso! Faça login com seu e-mail.");
         window.location.href = "/login";
       }
     }
@@ -136,7 +139,6 @@ export default function Register() {
 
   const renderSideCard = (product: any) => {
     if (!product) return null;
-
     const formattedPrice = product.price ? `R$ ${product.price.toLocaleString("pt-BR", { minimumFractionDigits: 2 })}` : "Ver Oferta";
     const formattedOldPrice = product.old_price ? `R$ ${product.old_price.toLocaleString("pt-BR", { minimumFractionDigits: 2 })}` : null;
     
@@ -144,7 +146,6 @@ export default function Register() {
     const isShopee = platformLower.includes("shopee");
     const isAmazon = platformLower.includes("amazon");
     const isMercadoLivre = platformLower.includes("mercado") || platformLower.includes("ml");
-
     const headerBgColor = isShopee ? "#EE4D2D" : isAmazon ? "#FF9900" : "#FFE600";
     const headerTextColor = isAmazon || isMercadoLivre ? "#1E293B" : "#FFFFFF";
     const badgeText = isShopee ? "🛒 Achadinhos Shopee" : isAmazon ? "📦 Achadinhos Amazon" : "📦 Achadinhos Mercado Livre";
@@ -179,7 +180,7 @@ export default function Register() {
       <div style={{ display: "flex", justifyContent: "center", alignItems: "flex-start", gap: "25px", maxWidth: "1250px", margin: "0 auto", flexDirection: "column" }}>
         
         <div style={{ display: "flex", justifyContent: "center", alignItems: "flex-start", gap: "25px", width: "100%" }}>
-          {/* 📢 Banner Lateral Esquerdo (Sticky apenas no Desktop) */}
+          {/* 📢 Banner Lateral Esquerdo */}
           <aside style={{ display: "none", flexDirection: "column", width: "260px", position: "sticky", top: "20px" }} className="side-banner-left">
             {renderSideCard(leftProduct)}
           </aside>
@@ -187,12 +188,11 @@ export default function Register() {
           {/* 📝 Formulário Central de Cadastro */}
           <div style={{ flex: "1", maxWidth: "460px", width: "100%", background: "#ffffff", padding: "40px", borderRadius: "12px", boxShadow: "0 4px 20px rgba(0,0,0,0.08)", border: "1px solid #eaeaea", boxSizing: "border-box", margin: "0 auto" }}>
             
-            {/* Título Principal */}
             <h1 style={{ fontSize: "22px", fontWeight: "bold", textAlign: "center", color: "#0A2540", marginBottom: "24px" }}>
               Criar Nova Conta
             </h1>
 
-            {/* Chave Seletora de Abas Simplificada */}
+            {/* Chave Seletora de Abas */}
             <div style={{ display: "flex", gap: "10px", marginBottom: "24px", background: "#f8f9fa", padding: "4px", borderRadius: "8px", border: "1px solid #e2e8f0" }}>
               <button
                 type="button"
@@ -212,7 +212,6 @@ export default function Register() {
               >
                 📱 Anunciante
               </button>
-
               <button
                 type="button"
                 onClick={() => setTab("store")}
@@ -233,22 +232,46 @@ export default function Register() {
               </button>
             </div>
 
-            {/* Formulário Condicional */}
             {tab === "advertiser" ? (
-              /* Formulário de Anunciante (Celular e Senha) */
+              /* Formulário de Anunciante (Nome, E-mail Real, WhatsApp Obrigatório e Senha) */
               <form onSubmit={handleAdvertiserRegister} style={{ display: "flex", flexDirection: "column", gap: "14px" }}>
                 <div>
                   <label style={{ display: "block", fontSize: "13px", fontWeight: "600", color: "#334155", marginBottom: "6px" }}>
-                    Número do Celular (com DDD)
+                    Seu Nome
+                  </label>
+                  <input 
+                    style={{ width: "100%", padding: "11px 14px", border: "1px solid #cbd5e1", borderRadius: "8px", color: "#000", fontSize: "14px", outline: "none", boxSizing: "border-box" }} 
+                    placeholder="Ex: João Silva" 
+                    required 
+                    value={advertiserForm.name}
+                    onChange={(e) => setAdvertiserForm({ ...advertiserForm, name: e.target.value })} 
+                  />
+                </div>
+                <div>
+                  <label style={{ display: "block", fontSize: "13px", fontWeight: "600", color: "#334155", marginBottom: "6px" }}>
+                    E-mail de Acesso (para login e recuperação)
+                  </label>
+                  <input 
+                    style={{ width: "100%", padding: "11px 14px", border: "1px solid #cbd5e1", borderRadius: "8px", color: "#000", fontSize: "14px", outline: "none", boxSizing: "border-box" }} 
+                    type="email"
+                    placeholder="seu@email.com" 
+                    required 
+                    value={advertiserForm.email}
+                    onChange={(e) => setAdvertiserForm({ ...advertiserForm, email: e.target.value })} 
+                  />
+                </div>
+                <div>
+                  <label style={{ display: "block", fontSize: "13px", fontWeight: "600", color: "#334155", marginBottom: "6px" }}>
+                    WhatsApp (com DDD)
                   </label>
                   <input 
                     style={{ width: "100%", padding: "11px 14px", border: "1px solid #cbd5e1", borderRadius: "8px", color: "#000", fontSize: "14px", outline: "none", boxSizing: "border-box" }} 
                     placeholder="Ex: 18912345678" 
                     required 
-                    onChange={(e) => setAdvertiserForm({ ...advertiserForm, phone: e.target.value })} 
+                    value={advertiserForm.whatsapp}
+                    onChange={(e) => setAdvertiserForm({ ...advertiserForm, whatsapp: e.target.value })} 
                   />
                 </div>
-
                 <div>
                   <label style={{ display: "block", fontSize: "13px", fontWeight: "600", color: "#334155", marginBottom: "6px" }}>
                     Senha
@@ -256,12 +279,13 @@ export default function Register() {
                   <input 
                     style={{ width: "100%", padding: "11px 14px", border: "1px solid #cbd5e1", borderRadius: "8px", color: "#000", fontSize: "14px", outline: "none", boxSizing: "border-box" }} 
                     type="password" 
-                    placeholder="Sua senha de acesso" 
+                    placeholder="Sua senha (mínimo 6 caracteres)" 
+                    minLength={6}
                     required 
+                    value={advertiserForm.password}
                     onChange={(e) => setAdvertiserForm({ ...advertiserForm, password: e.target.value })} 
                   />
                 </div>
-
                 <button 
                   type="submit" 
                   disabled={loading} 
@@ -292,10 +316,10 @@ export default function Register() {
                     style={{ width: "100%", padding: "11px 14px", border: "1px solid #cbd5e1", borderRadius: "8px", color: "#000", fontSize: "14px", outline: "none", boxSizing: "border-box" }} 
                     placeholder="Ex: Minha Loja" 
                     required 
+                    value={storeForm.name}
                     onChange={(e) => setStoreForm({ ...storeForm, name: e.target.value })} 
                   />
                 </div>
-
                 <div>
                   <label style={{ display: "block", fontSize: "13px", fontWeight: "600", color: "#334155", marginBottom: "6px" }}>
                     E-mail de Acesso
@@ -305,10 +329,10 @@ export default function Register() {
                     type="email" 
                     placeholder="seu@email.com" 
                     required 
+                    value={storeForm.email}
                     onChange={(e) => setStoreForm({ ...storeForm, email: e.target.value })} 
                   />
                 </div>
-
                 <div>
                   <label style={{ display: "block", fontSize: "13px", fontWeight: "600", color: "#334155", marginBottom: "6px" }}>
                     Senha
@@ -317,11 +341,12 @@ export default function Register() {
                     style={{ width: "100%", padding: "11px 14px", border: "1px solid #cbd5e1", borderRadius: "8px", color: "#000", fontSize: "14px", outline: "none", boxSizing: "border-box" }} 
                     type="password" 
                     placeholder="Sua senha (mínimo 6 caracteres)" 
+                    minLength={6}
                     required 
+                    value={storeForm.password}
                     onChange={(e) => setStoreForm({ ...storeForm, password: e.target.value })} 
                   />
                 </div>
-
                 <div>
                   <label style={{ display: "block", fontSize: "13px", fontWeight: "600", color: "#334155", marginBottom: "6px" }}>
                     WhatsApp para Contato
@@ -330,10 +355,10 @@ export default function Register() {
                     style={{ width: "100%", padding: "11px 14px", border: "1px solid #cbd5e1", borderRadius: "8px", color: "#000", fontSize: "14px", outline: "none", boxSizing: "border-box" }} 
                     placeholder="Ex: 18912345678" 
                     required 
+                    value={storeForm.whatsapp}
                     onChange={(e) => setStoreForm({ ...storeForm, whatsapp: e.target.value })} 
                   />
                 </div>
-
                 <button 
                   type="submit" 
                   disabled={loading} 
@@ -361,23 +386,20 @@ export default function Register() {
                 Já tem uma conta? Faça login
               </a>
             </div>
-
           </div>
 
-          {/* 📢 Banner Lateral Direito (Sticky apenas no Desktop) */}
+          {/* 📢 Banner Lateral Direito */}
           <aside style={{ display: "none", flexDirection: "column", width: "260px", position: "sticky", top: "20px" }} className="side-banner-right">
             {renderSideCard(rightProduct)}
           </aside>
         </div>
 
-        {/* 📱 Banner exclusivo para Celular (Aparece abaixo do formulário em telas pequenas) */}
+        {/* 📱 Banner exclusivo para Celular */}
         <div style={{ width: "100%", maxWidth: "460px", margin: "20px auto 0 auto" }} className="mobile-banner-container">
           {renderSideCard(mobileProduct)}
         </div>
-
       </div>
 
-      {/* Regras CSS Responsivas: Exibe laterais no Desktop e oculta o banner extra mobile; Inverte no Celular */}
       <style jsx global>{`
         .mobile-banner-container {
           display: block;

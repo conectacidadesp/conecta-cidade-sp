@@ -1,8 +1,13 @@
 "use client";
-
 import { useState, useEffect } from "react";
 import { supabase } from "@/lib/supabase";
 import { useRouter } from "next/navigation";
+
+// Lista de cidades disponíveis no portal
+const CITIES_LIST = [
+  "Rubiácea-SP",
+  "Guararapes-SP",
+];
 
 // 📂 Dicionário de Categorias e Subcategorias Atualizado
 const categoriesData: Record<string, { icon: string; subs: string[] }> = {
@@ -62,21 +67,17 @@ const compressAndResizeImage = (file: File, targetSize = 800, quality = 0.8): Pr
       canvas.width = targetSize;
       canvas.height = targetSize;
       const ctx = canvas.getContext("2d");
-
       if (!ctx) {
         return reject(new Error("Erro ao processar imagem no navegador."));
       }
-
       ctx.fillStyle = "#FFFFFF";
       ctx.fillRect(0, 0, targetSize, targetSize);
-
       let width = img.width;
       let height = img.height;
       let renderWidth = targetSize;
       let renderHeight = targetSize;
       let offsetX = 0;
       let offsetY = 0;
-
       if (width > height) {
         renderHeight = (height * targetSize) / width;
         offsetY = (targetSize - renderHeight) / 2;
@@ -84,9 +85,7 @@ const compressAndResizeImage = (file: File, targetSize = 800, quality = 0.8): Pr
         renderWidth = (width * targetSize) / height;
         offsetX = (targetSize - renderWidth) / 2;
       }
-
       ctx.drawImage(img, offsetX, offsetY, renderWidth, renderHeight);
-
       canvas.toBlob(
         (blob) => {
           if (blob) {
@@ -108,6 +107,8 @@ export default function CreateAd() {
   const [description, setDescription] = useState("");
   const [priceDisplay, setPriceDisplay] = useState(""); 
   const [rawPriceValue, setRawPriceValue] = useState<number | null>(null); 
+  const [isPriceNegotiable, setIsPriceNegotiable] = useState(false); // ✨ Novo estado para Preço a Combinar
+
   const [category, setCategory] = useState("");
   const [subcategory, setSubcategory] = useState("");
   const [whatsapp, setWhatsapp] = useState("");
@@ -115,16 +116,22 @@ export default function CreateAd() {
   const [imageFile, setImageFile] = useState<File | null>(null);
   const [loading, setLoading] = useState(false);
   const [checkingAuth, setCheckingAuth] = useState(true);
-  const [city, setCity] = useState("Rubiácea-SP");
   
+  // 🏪 Novo estado: Exibir apenas no cardápio / Ocultar do marketplace geral
+  const [hideInClassificados, setHideInClassificados] = useState(false);
+  
+  // 🏷️ Sugestões inteligentes de subcategorias já usadas pelo lojista
+  const [existingStoreSubcategories, setExistingStoreSubcategories] = useState<string[]>([]);
+  // 🏙️ Estados para Multi-Cidades
+  const [selectedCities, setSelectedCities] = useState<string[]>([]);
+  const [allCities, setAllCities] = useState(false);
   // 🔄 Estados dos Produtos Afiliados (Laterais e Mobile)
   const [affiliateProducts, setAffiliateProducts] = useState<any[]>([]);
   const [leftIndex, setLeftIndex] = useState(0);
   const [rightIndex, setRightIndex] = useState(0);
   const [mobileIndex, setMobileIndex] = useState(0);
-
+  
   const router = useRouter();
-
   const [userType, setUserType] = useState<string>("client");
   const [storeType, setStoreType] = useState<"marketplace" | "food">("marketplace");
   const [profileWhatsapp, setProfileWhatsapp] = useState("");
@@ -135,12 +142,12 @@ export default function CreateAd() {
     if (typeof window !== "undefined") {
       const savedCity = localStorage.getItem("selectedCity");
       if (savedCity) {
-        setCity(savedCity);
+        setSelectedCities([savedCity]);
+      } else {
+        setSelectedCities(["Rubiácea-SP"]);
       }
     }
-
     async function fetchData() {
-      // 1. Verificar Sessão do Usuário
       const { data: { user }, error: authError } = await supabase.auth.getUser();
       
       if (authError || !user) {
@@ -148,9 +155,8 @@ export default function CreateAd() {
         router.push("/login");
         return;
       }
-
       setLoggedUserId(user.id);
-
+      
       const userEmail = user.email || "";
       const comum = userEmail.toLowerCase().endsWith("@anunciante.com");
       setIsAnuncianteComum(comum);
@@ -171,7 +177,16 @@ export default function CreateAd() {
         }
       }
 
-      // 2. Buscar Produtos Afiliados da tabela correta 'affiliate_ads'
+      // 🔍 Busca subcategorias já cadastradas por este lojista para sugestão rápida
+      const { data: userAds } = await supabase
+        .from("ads")
+        .select("subcategory")
+        .eq("user_id", user.id);
+      if (userAds) {
+        const uniqueSubs = Array.from(new Set(userAds.map(a => a.subcategory).filter(Boolean))) as string[];
+        setExistingStoreSubcategories(uniqueSubs);
+      }
+
       const { data: affiliates } = await supabase
         .from("affiliate_ads")
         .select("*")
@@ -183,43 +198,36 @@ export default function CreateAd() {
         setRightIndex(Math.floor(affiliates.length / 2));
         setMobileIndex(0);
       }
-
       setCheckingAuth(false);
     }
-
     fetchData();
   }, [router]);
 
   // ⏱️ Efeito de Rotação Automática (A cada 5 segundos)
   useEffect(() => {
     if (affiliateProducts.length <= 1) return;
-
     const interval = setInterval(() => {
       setLeftIndex((prev) => (prev + 1) % affiliateProducts.length);
       setRightIndex((prev) => (prev - 1 + affiliateProducts.length) % affiliateProducts.length);
       setMobileIndex((prev) => (prev + 1) % affiliateProducts.length);
     }, 5000);
-
     return () => clearInterval(interval);
   }, [affiliateProducts.length]);
 
+  // 💰 Máscara Monetária Automática (Padrão R$ X,XX)
   const handlePriceChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const valueOnly = e.target.value.replace(/\D/g, "");
-    
     if (!valueOnly) {
       setPriceDisplay("");
       setRawPriceValue(null);
       return;
     }
-
     const numericValue = parseInt(valueOnly, 10) / 100;
     setRawPriceValue(numericValue);
-
     const formatted = numericValue.toLocaleString("pt-BR", {
       style: "currency",
       currency: "BRL",
     });
-
     setPriceDisplay(formatted);
   };
 
@@ -228,14 +236,37 @@ export default function CreateAd() {
     setSubcategory(""); 
   };
 
+  const handleCityToggle = (cityName: string) => {
+    if (selectedCities.includes(cityName)) {
+      setSelectedCities(selectedCities.filter((c) => c !== cityName));
+    } else {
+      setSelectedCities([...selectedCities, cityName]);
+    }
+  };
+
   const handleCreate = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!loggedUserId) return;
 
+    if (!allCities && selectedCities.length === 0) {
+      alert("⚠️ Selecione pelo menos uma cidade ou marque a opção 'Todas as cidades'.");
+      return;
+    }
+
+    // ✨ Validação: Se for modo food (cardápio), o preço é obrigatório e não pode ser "a combinar"
+    const isFoodStore = userType === "store" && storeType === "food";
+    if (isFoodStore && isPriceNegotiable) {
+      alert("⚠️ Lojas do tipo Cardápio precisam obrigatoriamente informar o preço dos itens.");
+      return;
+    }
+    if (isFoodStore && rawPriceValue === null) {
+      alert("⚠️ Por favor, informe o preço do item para o cardápio.");
+      return;
+    }
+
     setLoading(true);
-
     const finalWhatsapp = whatsapp.trim() || profileWhatsapp;
-
+    
     if (!finalWhatsapp) {
       alert("⚠️ Por favor, informe um número ou contato de WhatsApp.");
       setLoading(false);
@@ -243,26 +274,22 @@ export default function CreateAd() {
     }
 
     let uploadedImageUrl = "";
-
     if (imageFile) {
       try {
         const compressedBlob = await compressAndResizeImage(imageFile, 800, 0.8);
         const fileName = `${loggedUserId}-${Date.now()}.jpg`;
         const filePath = `public/${fileName}`;
-
         const { error: uploadError } = await supabase.storage
           .from("ads-images")
           .upload(filePath, compressedBlob, {
             contentType: "image/jpeg",
             upsert: true
           });
-
         if (uploadError) {
           alert("Erro ao subir a foto: " + uploadError.message);
           setLoading(false);
           return;
         }
-
         const { data } = supabase.storage.from("ads-images").getPublicUrl(filePath);
         uploadedImageUrl = data.publicUrl;
       } catch (err: unknown) {
@@ -273,31 +300,37 @@ export default function CreateAd() {
       }
     }
 
-    const customCategoryValue = (userType === "store" && storeType === "food") ? subcategory : null;
+    const customCategoryValue = isFoodStore ? subcategory : null;
+    const primaryCity = selectedCities[0] || "Rubiácea-SP";
+
+    // Se estiver marcado como "preço a combinar", salvamos o preço como null no banco
+    const finalPrice = isPriceNegotiable ? null : rawPriceValue;
 
     const { error } = await supabase.from("ads").insert([
       {
         title,
         description,
-        price: rawPriceValue,
-        category,
+        price: finalPrice,
+        category: category || "Outros",
         subcategory: subcategory || null,
         custom_category: customCategoryValue,
         whatsapp: finalWhatsapp,
-        city: city,
+        city: primaryCity,
+        cities: selectedCities,
+        all_cities: allCities,
         image_url: uploadedImageUrl || null,
         user_id: loggedUserId,
-        advertiser_name: isAnuncianteComum ? (customAdvertiserName.trim() || null) : null
+        advertiser_name: isAnuncianteComum ? (customAdvertiserName.trim() || null) : null,
+        show_in_classificados: !hideInClassificados, 
       },
     ]);
 
     setLoading(false);
-
     if (error) {
       alert("Erro ao criar anúncio: " + error.message);
     } else {
-      alert("Anúncio publicado com sucesso!");
-      window.location.href = "/";
+      alert("Item adicionado com sucesso!");
+      window.location.href = userType === "store" ? `/shop/${loggedUserId}` : "/";
     }
   };
 
@@ -305,15 +338,12 @@ export default function CreateAd() {
     return <p style={{ textAlign: "center", marginTop: 100, fontFamily: "sans-serif", color: "#64748B" }}>Verificando autenticação...</p>;
   }
 
-  // 🧩 Extração dos produtos correntes para as laterais e mobile
   const leftProduct = affiliateProducts.length > 0 ? affiliateProducts[leftIndex] : null;
   const rightProduct = affiliateProducts.length > 0 ? affiliateProducts[rightIndex] : null;
   const mobileProduct = affiliateProducts.length > 0 ? affiliateProducts[mobileIndex] : null;
 
-  // Função auxiliar de renderização de card lateral idêntica ao componente original
   const renderSideCard = (product: any) => {
     if (!product) return null;
-
     const formattedPrice = product.price ? `R$ ${product.price.toLocaleString("pt-BR", { minimumFractionDigits: 2 })}` : "Ver Oferta";
     const formattedOldPrice = product.old_price ? `R$ ${product.old_price.toLocaleString("pt-BR", { minimumFractionDigits: 2 })}` : null;
     
@@ -321,69 +351,27 @@ export default function CreateAd() {
     const isShopee = platformLower.includes("shopee");
     const isAmazon = platformLower.includes("amazon");
     const isMercadoLivre = platformLower.includes("mercado") || platformLower.includes("ml");
-
     const headerBgColor = isShopee ? "#EE4D2D" : isAmazon ? "#FF9900" : "#FFE600";
     const headerTextColor = isAmazon || isMercadoLivre ? "#1E293B" : "#FFFFFF";
     const badgeText = isShopee ? "🛒 Achadinhos Shopee" : isAmazon ? "📦 Achadinhos Amazon" : "📦 Achadinhos Mercado Livre";
 
     return (
-      <div style={{ 
-        border: "1px solid #E2E8F0", 
-        borderRadius: 14, 
-        overflow: "hidden", 
-        backgroundColor: "#ffffff", 
-        display: "flex", 
-        flexDirection: "column", 
-        boxShadow: "0 10px 25px -5px rgba(0, 0, 0, 0.05)",
-        width: "100%"
-      }}>
+      <div style={{ border: "1px solid #E2E8F0", borderRadius: 14, overflow: "hidden", backgroundColor: "#ffffff", display: "flex", flexDirection: "column", boxShadow: "0 10px 25px -5px rgba(0, 0, 0, 0.05)", width: "100%" }}>
         <div style={{ backgroundColor: headerBgColor, padding: "8px 10px", textAlign: "center", width: "100%", display: "flex", alignItems: "center", justifyContent: "center", gap: 6 }}>
-          <span style={{ fontSize: 13, fontWeight: "bold", color: headerTextColor, textTransform: "uppercase" }}>
-            {badgeText}
-          </span>
+          <span style={{ fontSize: 13, fontWeight: "bold", color: headerTextColor, textTransform: "uppercase" }}>{badgeText}</span>
         </div>
-
         <div style={{ width: "100%", height: 210, backgroundColor: "#F8FAFC", display: "flex", alignItems: "center", justifyContent: "center", overflow: "hidden", borderBottom: "1px solid #F1F5F9", padding: 8, boxSizing: "border-box" }}>
           <img src={product.image_url} alt={product.title} style={{ width: "100%", height: "100%", objectFit: "contain", objectPosition: "center" }} />
         </div>
-
         <div style={{ padding: 14, flex: 1, display: "flex", flexDirection: "column", justifyContent: "space-between" }}>
           <div>
-            <span style={{ fontSize: 11, backgroundColor: "#FEF3C7", color: "#D97706", padding: "2px 8px", borderRadius: 6, fontWeight: "bold", display: "inline-block" }}>
-              Promoção Recomendada
-            </span>
-            <h4 style={{ fontSize: 14, margin: "8px 0 6px", color: "#0B2545", fontWeight: "bold", wordBreak: "break-word", lineHeight: "1.3", height: "36px", overflow: "hidden" }}>
-              {product.title}
-            </h4>
+            <span style={{ fontSize: 11, backgroundColor: "#FEF3C7", color: "#D97706", padding: "2px 8px", borderRadius: 6, fontWeight: "bold", display: "inline-block" }}>Promoção Recomendada</span>
+            <h4 style={{ fontSize: 14, margin: "8px 0 6px", color: "#0B2545", fontWeight: "bold", wordBreak: "break-word", lineHeight: "1.3", height: "36px", overflow: "hidden" }}>{product.title}</h4>
           </div>
-          
           <div style={{ marginTop: 6 }}>
-            {formattedOldPrice && (
-              <span style={{ fontSize: 12, color: "#94A3B8", textDecoration: "line-through", display: "block" }}>
-                De {formattedOldPrice}
-              </span>
-            )}
-            <p style={{ fontSize: 17, fontWeight: "bold", color: isAmazon ? "#B45309" : isShopee ? "#EE4D2D" : "#2563EB", margin: "0 0 10px" }}>
-              Por {formattedPrice}
-            </p>
-
-            <a
-              href={product.affiliate_link}
-              target="_blank"
-              rel="noopener noreferrer"
-              style={{ 
-                display: "block", 
-                textAlign: "center", 
-                backgroundColor: "#22C55E", 
-                color: "#fff", 
-                padding: "10px", 
-                borderRadius: 8, 
-                textDecoration: "none", 
-                fontSize: 13, 
-                fontWeight: "bold", 
-                boxShadow: "0 2px 5px rgba(34, 197, 94, 0.3)"
-              }}
-            >
+            {formattedOldPrice && <span style={{ fontSize: 12, color: "#94A3B8", textDecoration: "line-through", display: "block" }}>De {formattedOldPrice}</span>}
+            <p style={{ fontSize: 17, fontWeight: "bold", color: isAmazon ? "#B45309" : isShopee ? "#EE4D2D" : "#2563EB", margin: "0 0 10px" }}>Por {formattedPrice}</p>
+            <a href={product.affiliate_link} target="_blank" rel="noopener noreferrer" style={{ display: "block", textAlign: "center", backgroundColor: "#22C55E", color: "#fff", padding: "10px", borderRadius: 8, textDecoration: "none", fontSize: 13, fontWeight: "bold", boxShadow: "0 2px 5px rgba(34, 197, 94, 0.3)" }}>
               🔥 Ver na Loja
             </a>
           </div>
@@ -392,22 +380,23 @@ export default function CreateAd() {
     );
   };
 
+  const isFoodStoreMode = userType === "store" && storeType === "food";
+
   return (
     <main style={{ padding: "30px 15px", backgroundColor: "#F8FAFC", minHeight: "100vh", fontFamily: "sans-serif" }}>
-      {/* Container Principal */}
       <div style={{ display: "flex", justifyContent: "center", alignItems: "flex-start", gap: "25px", maxWidth: "1250px", margin: "0 auto", flexDirection: "column" }}>
         
         <div style={{ display: "flex", justifyContent: "center", alignItems: "flex-start", gap: "25px", width: "100%" }}>
-          {/* 📢 Banner Lateral Esquerdo (Sticky apenas no Desktop) */}
+          {/* 📢 Banner Lateral Esquerdo */}
           <aside style={{ display: "none", flexDirection: "column", width: "260px", position: "sticky", top: "20px" }} className="side-banner-left">
             {renderSideCard(leftProduct)}
           </aside>
 
           {/* 📝 Formulário Central de Criação de Anúncio */}
           <div style={{ flex: "1", maxWidth: "540px", width: "100%", border: "1px solid #E2E8F0", padding: "30px", borderRadius: "12px", backgroundColor: "#fff", boxShadow: "0 4px 6px -1px rgba(0,0,0,0.1)", boxSizing: "border-box", margin: "0 auto" }}>
-            <h1 style={{ fontSize: 24, marginBottom: 8, fontWeight: "bold", textAlign: "center", color: "#0F4C81" }}>📢 Criar Novo Anúncio</h1>
-            <p style={{ color: "#64748B", marginBottom: 25, fontSize: 14, textAlign: "center" }}>Preencha os campos abaixo para publicar seu produto ou serviço.</p>
-
+            <h1 style={{ fontSize: 24, marginBottom: 8, fontWeight: "bold", textAlign: "center", color: "#0F4C81" }}>📢 Adicionar Produto ou Item</h1>
+            <p style={{ color: "#64748B", marginBottom: 25, fontSize: 14, textAlign: "center" }}>Cadastre itens para o seu cardápio/loja ou publique no marketplace.</p>
+            
             <form onSubmit={handleCreate} style={{ display: "flex", flexDirection: "column", gap: 16 }}>
               
               {isAnuncianteComum && (
@@ -419,23 +408,104 @@ export default function CreateAd() {
                     onChange={(e) => setCustomAdvertiserName(e.target.value)} 
                     style={{ padding: 12, border: "1px solid #CBD5E1", borderRadius: 6, fontSize: 15, width: "100%", boxSizing: "border-box" }} 
                   />
-                  <span style={{ fontSize: 12, color: "#64748B" }}>Aparecerá em destaque no topo do anúncio para contato direto.</span>
                 </div>
               )}
 
-              <input placeholder="Título do Anúncio" value={title} onChange={(e) => setTitle(e.target.value)} required style={{ padding: 12, border: "1px solid #CBD5E1", borderRadius: 6, fontSize: 15, width: "100%", boxSizing: "border-box" }} />
+              <input placeholder="Título do Produto (Ex: Coca Cola Lata 350ml)" value={title} onChange={(e) => setTitle(e.target.value)} required style={{ padding: 12, border: "1px solid #CBD5E1", borderRadius: 6, fontSize: 15, width: "100%", boxSizing: "border-box" }} />
               <textarea placeholder="Descrição Detalhada" value={description} onChange={(e) => setDescription(e.target.value)} required rows={3} style={{ padding: 12, border: "1px solid #CBD5E1", borderRadius: 6, fontSize: 15, resize: "none", width: "100%", boxSizing: "border-box" }} />
               
-              <input 
-                placeholder="Preço (Ex: 50,00) - Opcional" 
-                type="text" 
-                value={priceDisplay} 
-                onChange={handlePriceChange} 
-                style={{ padding: 12, border: "1px solid #CBD5E1", borderRadius: 6, fontSize: 15, width: "100%", boxSizing: "border-box" }} 
-              />
+              {/* 💰 CAMPO DE PREÇO E OPÇÃO "PREÇO A COMBINAR" */}
+              <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
+                <input 
+                  placeholder={isPriceNegotiable ? "Preço a Combinar (Desativado)" : "Preço (Ex: R$ 5,00)"} 
+                  type="text" 
+                  value={isPriceNegotiable ? "" : priceDisplay} 
+                  onChange={handlePriceChange} 
+                  disabled={isPriceNegotiable}
+                  required={!isPriceNegotiable}
+                  style={{ 
+                    padding: 12, 
+                    border: "1px solid #CBD5E1", 
+                    borderRadius: 6, 
+                    fontSize: 15, 
+                    width: "100%", 
+                    boxSizing: "border-box", 
+                    fontWeight: "bold", 
+                    color: "#0F4C81",
+                    backgroundColor: isPriceNegotiable ? "#F1F5F9" : "#fff",
+                    cursor: isPriceNegotiable ? "not-allowed" : "text"
+                  }} 
+                />
+
+                {/* Exibe o checkbox de preço a combinar apenas para anúncios gerais/lojas que não são do tipo food */}
+                {!isFoodStoreMode && (
+                  <label style={{ display: "flex", alignItems: "center", gap: 8, fontSize: 13, color: "#334155", cursor: "pointer", fontWeight: "500" }}>
+                    <input 
+                      type="checkbox"
+                      checked={isPriceNegotiable}
+                      onChange={(e) => {
+                        setIsPriceNegotiable(e.target.checked);
+                        if (e.target.checked) {
+                          setPriceDisplay("");
+                          setRawPriceValue(null);
+                        }
+                      }}
+                      style={{ width: 15, height: 15, accentColor: "#0F4C81", cursor: "pointer" }}
+                    />
+                    🤝 Preço a combinar (Negociar no WhatsApp)
+                  </label>
+                )}
+              </div>
+              
+              {/* 🏪 OPÇÃO DE EXIBIR NO MARKETPLACE */}
+              <div style={{ backgroundColor: "#F1F5F9", padding: "12px 14px", borderRadius: 8, border: "1px solid #CBD5E1" }}>
+                <label style={{ display: "flex", alignItems: "center", gap: 8, fontSize: 14, fontWeight: "bold", color: "#0F4C81", cursor: "pointer" }}>
+                  <input 
+                    type="checkbox" 
+                    checked={hideInClassificados} 
+                    onChange={(e) => setHideInClassificados(e.target.checked)}
+                    style={{ width: 16, height: 16, accentColor: "#0F4C81", cursor: "pointer" }}
+                  />
+                  📦 Ocultar do Feed Geral (Exibir apenas no Cardápio / Loja Virtual)
+                </label>
+                <span style={{ fontSize: 11, color: "#64748B", display: "block", marginTop: 4, marginLeft: 24 }}>
+                  Ideal para itens de cardápio (bebidas, adicionais, etc.) que não precisam poluir o classificados geral.
+                </span>
+              </div>
+
+              {/* 🏙️ SELETOR DE CIDADES */}
+              <div style={{ display: "flex", flexDirection: "column", gap: 8, backgroundColor: "#F8FAFC", padding: "14px", borderRadius: "8px", border: "1px solid #CBD5E1" }}>
+                <label style={{ fontSize: 14, fontWeight: "bold", color: "#1E293B" }}>📍 Onde este item deve estar ativo?</label>
+                
+                <label style={{ display: "flex", alignItems: "center", gap: 8, fontSize: 14, fontWeight: "bold", color: "#0F4C81", cursor: "pointer", marginBottom: 4 }}>
+                  <input 
+                    type="checkbox" 
+                    checked={allCities} 
+                    onChange={(e) => setAllCities(e.target.checked)}
+                    style={{ width: 16, height: 16, accentColor: "#0F4C81", cursor: "pointer" }}
+                  />
+                  🌐 Disponível em TODAS as cidades
+                </label>
+                {!allCities && (
+                  <div style={{ display: "flex", flexDirection: "column", gap: 6, paddingLeft: 4, marginTop: 4 }}>
+                    <span style={{ fontSize: 12, color: "#64748B" }}>Cidades específicas:</span>
+                    {CITIES_LIST.map((city) => (
+                      <label key={city} style={{ display: "flex", alignItems: "center", gap: 8, fontSize: 14, color: "#334155", cursor: "pointer" }}>
+                        <input 
+                          type="checkbox" 
+                          checked={selectedCities.includes(city)}
+                          onChange={() => handleCityToggle(city)}
+                          style={{ width: 15, height: 15, accentColor: "#0F4C81", cursor: "pointer" }}
+                        />
+                        {city}
+                      </label>
+                    ))}
+                  </div>
+                )}
+              </div>
               
               <div style={{ display: "flex", flexDirection: "column", gap: 5 }}>
-                <label style={{ fontSize: 14, fontWeight: "bold", color: "#1E293B" }}>📁 Selecione a Categoria:</label>
+                <label style={{ fontSize: 14, fontWeight: "bold", color: "#1E293B" }}>📁 Categoria Principal:</label>
                 <select value={category} onChange={handleCategoryChange} required style={{ padding: 12, border: "1px solid #CBD5E1", borderRadius: 6, fontSize: 15, backgroundColor: "#fff", cursor: "pointer", width: "100%", boxSizing: "border-box" }}>
                   <option value="">-- Escolha uma categoria --</option>
                   {Object.keys(categoriesData).map((cat) => (
@@ -445,21 +515,38 @@ export default function CreateAd() {
               </div>
 
               {userType === "store" && category && storeType === "food" ? (
-                <div style={{ display: "flex", flexDirection: "column", gap: 5 }}>
-                  <label style={{ fontSize: 14, fontWeight: "bold", color: "#1E293B" }}>🍔 Categoria no Cardápio (Subcategoria):</label>
+                <div style={{ display: "flex", flexDirection: "column", gap: 6, backgroundColor: "#FFF7ED", padding: 12, borderRadius: 8, border: "1px solid #FDBA74" }}>
+                  <label style={{ fontSize: 14, fontWeight: "bold", color: "#9A3412" }}>🍔 Categoria no Cardápio (Ex: Lanches, Bebidas, Pizzas):</label>
                   <input
                     type="text"
-                    placeholder="Ex: Lanches, Bebidas, Porções, Sobremesas..."
+                    placeholder="Digite ou selecione a seção do cardápio..."
                     value={subcategory}
                     onChange={(e) => setSubcategory(e.target.value)}
                     required
-                    style={{ padding: 12, border: "1px solid #CBD5E1", borderRadius: 6, fontSize: 15, width: "100%", boxSizing: "border-box" }}
+                    style={{ padding: 10, border: "1px solid #CBD5E1", borderRadius: 6, fontSize: 14, width: "100%", boxSizing: "border-box", backgroundColor: "#fff" }}
                   />
+                  {existingStoreSubcategories.length > 0 && (
+                    <div>
+                      <span style={{ fontSize: 11, color: "#9A3412", display: "block", marginBottom: 4 }}>Categorias já criadas por você (clique para usar):</span>
+                      <div style={{ display: "flex", gap: 6, flexWrap: "wrap" }}>
+                        {existingStoreSubcategories.map((sub) => (
+                          <button
+                            key={sub}
+                            type="button"
+                            onClick={() => setSubcategory(sub)}
+                            style={{ background: "#EA580C", color: "#fff", border: "none", padding: "4px 10px", borderRadius: 12, fontSize: 11, cursor: "pointer", fontWeight: "bold" }}
+                          >
+                            + {sub}
+                          </button>
+                        ))}
+                      </div>
+                    </div>
+                  )}
                 </div>
               ) : (
                 category && categoriesData[category]?.subs.length > 0 && (
                   <div style={{ display: "flex", flexDirection: "column", gap: 5 }}>
-                    <label style={{ fontSize: 14, fontWeight: "bold", color: "#1E293B" }}>📂 Escolha uma subcategoria de {category}:</label>
+                    <label style={{ fontSize: 14, fontWeight: "bold", color: "#1E293B" }}>📂 Subcategoria:</label>
                     <select value={subcategory} onChange={(e) => setSubcategory(e.target.value)} required style={{ padding: 12, border: "1px solid #CBD5E1", borderRadius: 6, fontSize: 15, backgroundColor: "#fff", cursor: "pointer", width: "100%", boxSizing: "border-box" }}>
                       <option value="">-- Escolha uma subcategoria --</option>
                       {categoriesData[category].subs.map((sub) => (
@@ -471,7 +558,7 @@ export default function CreateAd() {
               )}
 
               <input 
-                placeholder={profileWhatsapp ? `WhatsApp (Ex: 18999998888 ou texto livre)` : "WhatsApp de Contato (Número ou texto livre)"} 
+                placeholder="WhatsApp para contato" 
                 value={whatsapp} 
                 onChange={(e) => setWhatsapp(e.target.value)} 
                 required={!profileWhatsapp}
@@ -481,42 +568,25 @@ export default function CreateAd() {
               <div style={{ display: "flex", flexDirection: "column", gap: 5 }}>
                 <label style={{ fontSize: 14, fontWeight: "bold", color: "#1E293B" }}>📸 Foto do Produto (Opcional):</label>
                 <input type="file" accept="image/*" onChange={(e) => e.target.files && setImageFile(e.target.files[0])} style={{ fontSize: 14, cursor: "pointer", width: "100%", boxSizing: "border-box" }} />
-                <span style={{ fontSize: 12, color: "#64748B" }}>A imagem será otimizada e redimensionada automaticamente.</span>
               </div>
 
               <button type="submit" disabled={loading} style={{ padding: 14, backgroundColor: "#0F4C81", color: "white", border: "none", borderRadius: 6, fontSize: 16, fontWeight: "bold", cursor: "pointer", marginTop: 10, width: "100%" }}>
-                {loading ? "Otimizando imagem e enviando..." : "🚀 Publicar Anúncio"}
+                {loading ? "Salvando..." : "🚀 Salvar e Publicar Item"}
               </button>
             </form>
           </div>
 
-          {/* 📢 Banner Lateral Direito (Sticky apenas no Desktop) */}
+          {/* 📢 Banner Lateral Direito */}
           <aside style={{ display: "none", flexDirection: "column", width: "260px", position: "sticky", top: "20px" }} className="side-banner-right">
             {renderSideCard(rightProduct)}
           </aside>
         </div>
 
-        {/* 📱 Banner exclusivo para Celular (Aparece abaixo do formulário em telas pequenas) */}
+        {/* 📱 Banner exclusivo para Celular */}
         <div style={{ width: "100%", maxWidth: "540px", margin: "20px auto 0 auto" }} className="mobile-banner-container">
           {renderSideCard(mobileProduct)}
         </div>
-
       </div>
-
-      {/* Regras CSS Responsivas: Exibe laterais no Desktop e oculta o extra mobile; Inverte no Celular */}
-      <style jsx global>{`
-        .mobile-banner-container {
-          display: block;
-        }
-        @media (min-width: 1024px) {
-          .side-banner-left, .side-banner-right {
-            display: flex !important;
-          }
-          .mobile-banner-container {
-            display: none !important;
-          }
-        }
-      `}</style>
     </main>
   );
 }

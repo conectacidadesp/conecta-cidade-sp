@@ -1,5 +1,4 @@
 "use client";
-
 import { useEffect, useState, useRef, Suspense } from "react";
 import { useParams, useSearchParams } from "next/navigation";
 import { supabase } from "@/lib/supabase";
@@ -13,6 +12,7 @@ interface Ad {
   image_url: string | null;
   whatsapp: string;
   category?: string | null;
+  subcategory?: string | null;
   is_hidden?: boolean | null;
 }
 
@@ -26,6 +26,7 @@ interface StoreProfile {
   store_type?: "marketplace" | "food";
   open_time?: string;
   close_time?: string;
+  delivery_fee?: number | null;
   created_at?: string;
 }
 
@@ -34,7 +35,6 @@ interface CartItem {
   quantity: number;
 }
 
-// 🎨 Mapeamento completo e flexível das cores do tema
 const THEMES: Record<string, { primary: string; bg: string; text: string; accent: string }> = {
   blue: { primary: "#0F4C81", bg: "#F8FAFC", text: "#1E293B", accent: "#22C55E" },
   "#0F4C81": { primary: "#0F4C81", bg: "#F8FAFC", text: "#1E293B", accent: "#22C55E" },
@@ -63,7 +63,6 @@ const THEMES: Record<string, { primary: string; bg: string; text: string; accent
   "#0F172A": { primary: "#0F172A", bg: "#F1F5F9", text: "#020617", accent: "#334155" },
 };
 
-// 🔤 Mapeamento das famílias de fontes
 const FONT_FAMILIES: Record<string, string> = {
   sans: "system-ui, -apple-system, sans-serif",
   serif: "Georgia, Cambria, 'Times New Roman', serif",
@@ -73,7 +72,6 @@ const FONT_FAMILIES: Record<string, string> = {
   cursive: "'Brush Script MT', 'Lucida Handwriting', cursive",
 };
 
-// 🕒 Função com fuso horário do Brasil (America/Sao_Paulo)
 function checkIsOpen(openTime?: string, closeTime?: string) {
   if (!openTime || !closeTime) return true;
   const now = new Date();
@@ -101,12 +99,17 @@ function ShopContent() {
   const [profile, setProfile] = useState<StoreProfile | null>(null);
   const [highlightedAdId, setHighlightedAdId] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
-
-  // Estados do Carrinho (Modo Food)
+  
+  const [selectedTabCategory, setSelectedTabCategory] = useState("Todos");
+  
+  // Estados do Carrinho & Endereço Estruturado
   const [cart, setCart] = useState<CartItem[]>([]);
   const [isCartOpen, setIsCartOpen] = useState(false);
   const [customerName, setCustomerName] = useState("");
-  const [customerAddress, setCustomerAddress] = useState("");
+  const [street, setStreet] = useState("");
+  const [number, setNumber] = useState("");
+  const [neighborhood, setNeighborhood] = useState("");
+  const [deliveryType, setDeliveryType] = useState<"delivery" | "pickup">("delivery");
   const [paymentMethod, setPaymentMethod] = useState("Pix");
   const [orderNotes, setOrderNotes] = useState("");
   const targetAdRef = useRef<HTMLDivElement | null>(null);
@@ -117,33 +120,41 @@ function ShopContent() {
       setLoading(true);
       let storeUserId = rawId;
       let adIdToHighlight = targetAdQuery;
+      
       const { data: directAd } = await supabase
         .from("ads")
         .select("*")
         .eq("id", rawId)
         .maybeSingle();
+        
       if (directAd) {
         storeUserId = directAd.user_id;
         adIdToHighlight = directAd.id;
       }
+      
       setHighlightedAdId(adIdToHighlight);
+      
       const { data: profileData, error: profileError } = await supabase
         .from("profiles")
         .select("*")
         .eq("id", storeUserId)
         .maybeSingle();
+        
       if (profileData && !profileError) {
         setProfile(profileData);
       }
+      
       const { data: adsData } = await supabase
         .from("ads")
         .select("*")
         .eq("user_id", storeUserId)
         .or("is_hidden.is.null,is_hidden.eq.false")
         .order("created_at", { ascending: false });
+        
       if (adsData) {
         setAds(adsData);
       }
+      
       setLoading(false);
       setTimeout(() => {
         if (targetAdRef.current) {
@@ -154,7 +165,6 @@ function ShopContent() {
     loadShopData();
   }, [rawId, targetAdQuery]);
 
-  // Busca a cor dinâmica cadastrada no banco ou ajusta pelo código hexadecimal
   const rawTheme = profile?.theme_color || "blue";
   const theme = THEMES[rawTheme] || {
     primary: rawTheme.startsWith("#") ? rawTheme : "#0F4C81",
@@ -162,11 +172,9 @@ function ShopContent() {
     text: "#1E293B",
     accent: "#22C55E",
   };
-
-  // 🔤 Busca a fonte dinâmica cadastrada no banco
+  
   const rawFontKey = profile?.font_style || "sans";
   const activeFontFamily = FONT_FAMILIES[rawFontKey] || FONT_FAMILIES.sans;
-
   const isFoodMode = profile?.store_type === "food";
   const isOpen = checkIsOpen(profile?.open_time, profile?.close_time);
 
@@ -200,25 +208,47 @@ function ShopContent() {
     );
   };
 
-  const cartTotal = cart.reduce((total, item) => total + (item.ad.price || 0) * item.quantity, 0);
+  const subtotal = cart.reduce((total, item) => total + (item.ad.price !== null ? item.ad.price * item.quantity : 0), 0);
+  const deliveryFee = deliveryType === "delivery" ? (profile?.delivery_fee || 0) : 0;
+  const cartTotal = subtotal + deliveryFee;
   const totalItemsCount = cart.reduce((sum, item) => sum + item.quantity, 0);
 
   const handleSendOrder = () => {
     if (cart.length === 0) return;
     const storeWhatsapp = ads[0]?.whatsapp || "";
     const formattedPhone = storeWhatsapp.replace(/\D/g, "");
-    let message = `🚀 *Olá! Estou vindo do ConectaCidadeSp para realizar meu pedido!*\n\n`;
-    message += `*🍕 NOVO PEDIDO - ${profile?.store_name || "Delivery"}*\n\n`;
-    message += `*Cliente:* ${customerName || "Não informado"}\n`;
-    if (customerAddress) message += `*Endereço:* ${customerAddress}\n`;
-    message += `*Pagamento:* ${paymentMethod}\n`;
-    if (orderNotes) message += `*Obs:* ${orderNotes}\n`;
-    message += `\n*ITENS DO PEDIDO:*\n`;
+    
+    let message = `🛒 *NOVO PEDIDO - ${profile?.store_name || "Delivery"}*\n`;
+    message += `*(Enviado via Conecta Cidade SP)*\n\n`;
+    message += `👤 *Cliente:* ${customerName.trim() ? customerName : "Não informado"}\n`;
+    message += `📦 *Modalidade:* ${deliveryType === "delivery" ? "🚚 Entrega em Domicílio" : "🏃 Retirada no Local"}\n`;
+    
+    if (deliveryType === "delivery") {
+      message += `📍 *Endereço:* ${street.trim() || "Não informada"}, Nº ${number.trim() || "S/N"}\n`;
+      if (neighborhood.trim()) {
+        message += `🏘️ *Bairro/Compl.:* ${neighborhood}\n`;
+      }
+    }
+    
+    message += `💳 *Forma de Pagamento:* ${paymentMethod}\n`;
+    if (orderNotes.trim()) {
+      message += `📝 *Observações:* ${orderNotes}\n`;
+    }
+    
+    message += `\n📋 *ITENS DO PEDIDO:*\n`;
     cart.forEach((item) => {
-      const itemTotal = (item.ad.price || 0) * item.quantity;
-      message += `▪ ${item.quantity}x ${item.ad.title} - R$ ${itemTotal.toFixed(2)}\n`;
+      const itemPriceText = item.ad.price !== null ? `R$ ${(item.ad.price * item.quantity).toFixed(2)}` : "A combinar";
+      message += `▪ ${item.quantity}x ${item.ad.title} — ${itemPriceText}\n`;
     });
-    message += `\n*TOTAL: R$ ${cartTotal.toFixed(2)}*`;
+    
+    message += `\n------------------\n`;
+    message += `Subtotal: R$ ${subtotal.toFixed(2)}\n`;
+    
+    if (deliveryType === "delivery") {
+      message += `Taxa de Entrega: R$ ${deliveryFee.toFixed(2)}\n`;
+    }
+    
+    message += `💰 *TOTAL A PAGAR: R$ ${cartTotal.toFixed(2)}*`;
     const waUrl = `https://wa.me/55${formattedPhone}?text=${encodeURIComponent(message)}`;
     window.open(waUrl, "_blank");
   };
@@ -227,8 +257,23 @@ function ShopContent() {
     return <p style={{ textAlign: "center", padding: "60px", color: "#64748B", fontWeight: "bold" }}>Carregando a vitrine da loja...</p>;
   }
 
-  const groupedAds = ads.reduce<Record<string, Ad[]>>((acc, ad) => {
-    const categoryName = ad.category && ad.category.trim() !== "" ? ad.category : "Outros Produtos";
+  const getItemCategory = (ad: Ad) => {
+    if (ad.subcategory && ad.subcategory.trim() !== "") {
+      return ad.subcategory.trim();
+    }
+    if (ad.category && ad.category.trim() !== "") {
+      return ad.category.trim();
+    }
+    return "Outros Produtos";
+  };
+
+  const categoriesList = ["Todos", ...Array.from(new Set(ads.map(ad => getItemCategory(ad))))];
+  const filteredAds = selectedTabCategory === "Todos" 
+    ? ads 
+    : ads.filter(ad => getItemCategory(ad) === selectedTabCategory);
+
+  const groupedAds = filteredAds.reduce<Record<string, Ad[]>>((acc, ad) => {
+    const categoryName = getItemCategory(ad);
     if (!acc[categoryName]) {
       acc[categoryName] = [];
     }
@@ -254,8 +299,17 @@ function ShopContent() {
           -webkit-box-orient: vertical;
           overflow: hidden;
         }
+        .modern-product-card {
+          transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+          background: linear-gradient(135deg, #ffffff 0%, ${theme.primary}07 100%);
+        }
+        .modern-product-card:hover {
+          transform: translateY(-5px);
+          box-shadow: 0 14px 32px rgba(0, 0, 0, 0.12) !important;
+          border-color: ${theme.primary} !important;
+        }
       `}</style>
-      {/* 🖼️ CAPA DA LOJA */}
+
       {profile?.banner_url && (
         <div style={{ width: "100%", height: "220px", overflow: "hidden", position: "relative" }}>
           <img
@@ -265,15 +319,15 @@ function ShopContent() {
           />
         </div>
       )}
+
       <main style={{ maxWidth: "1200px", margin: "0 auto", padding: "0 20px" }}>
-        {/* Header da Loja */}
         <div style={{ 
           display: "flex", 
           flexWrap: "wrap",
           alignItems: "center", 
           justifyContent: "space-between", 
           gap: "15px",
-          marginBottom: "30px", 
+          marginBottom: "20px", 
           backgroundColor: `${theme.primary}12`,
           border: `1px solid ${theme.primary}33`,
           borderRadius: "16px",
@@ -298,7 +352,6 @@ function ShopContent() {
               <p style={{ color: theme.text, opacity: 0.8, margin: "4px 0", fontSize: "13px", lineHeight: "1.3" }}>
                 {isFoodMode ? "🍔 Faça seu pedido online no nosso cardápio virtual!" : "Confira todo o nosso estoque virtual ativo abaixo"}
               </p>
-              {/* 🟢🔴 Indicador Visual de Aberto / Fechado em tempo real */}
               <div style={{ display: "flex", alignItems: "center", gap: 6, fontSize: 12, fontWeight: "bold", margin: "6px 0", padding: "3px 8px", backgroundColor: isOpen ? "#ECFDF5" : "#FEF2F2", borderRadius: 6, width: "fit-content" }}>
                 <span style={{ 
                   width: 8, 
@@ -314,22 +367,41 @@ function ShopContent() {
                   ({profile?.open_time || "08:00"} às {profile?.close_time || "18:00"})
                 </span>
               </div>
-              {/* 🛡️ Selo de Confiabilidade */}
-              {profile?.created_at && (
-                <p style={{ fontSize: 11, color: "#64748B", margin: "4px 0 0 0", display: "flex", alignItems: "center", gap: 4 }}>
-                  <span>🛡️</span>
-                  <span>Loja na Conecta Cidade SP desde <b>{new Date(profile.created_at).toLocaleDateString("pt-BR")}</b></span>
-                </p>
-              )}
             </div>
           </div>
           <span style={{ backgroundColor: theme.primary, color: "#fff", fontSize: "12px", fontWeight: "bold", padding: "8px 14px", borderRadius: "20px", boxShadow: "0 2px 8px rgba(0,0,0,0.15)", whiteSpace: "nowrap" }}>
             {isFoodMode ? "🍟 Modo Delivery & Cardápio" : "🛍️ Modo Loja / Marketplace"}
           </span>
         </div>
-        {/* Produtos e Categorias em Grade Lateral Profissional */}
+
+        {categoriesList.length > 2 && (
+          <div style={{ display: "flex", gap: "10px", overflowX: "auto", paddingBottom: "15px", marginBottom: "25px", scrollbarWidth: "none" }}>
+            {categoriesList.map((cat) => (
+              <button
+                key={cat}
+                onClick={() => setSelectedTabCategory(cat)}
+                style={{
+                  padding: "10px 18px",
+                  borderRadius: "25px",
+                  border: selectedTabCategory === cat ? `2px solid ${theme.primary}` : "1px solid #CBD5E1",
+                  backgroundColor: selectedTabCategory === cat ? theme.primary : "#FFFFFF",
+                  color: selectedTabCategory === cat ? "#FFFFFF" : "#334155",
+                  fontWeight: "bold",
+                  fontSize: "13px",
+                  cursor: "pointer",
+                  whiteSpace: "nowrap",
+                  boxShadow: selectedTabCategory === cat ? "0 4px 12px rgba(0,0,0,0.15)" : "none",
+                  transition: "all 0.2s ease",
+                }}
+              >
+                {cat}
+              </button>
+            ))}
+          </div>
+        )}
+
         {ads.length === 0 ? (
-          <p style={{ color: "#64748B" }}>Esta loja ainda não publicou produtos no estoque.</p>
+          <p style={{ color: "#64748B", textAlign: "center", padding: "40px" }}>Esta loja ainda não publicou produtos no estoque.</p>
         ) : (
           Object.entries(groupedAds).map(([category, items]) => {
             return (
@@ -342,7 +414,6 @@ function ShopContent() {
                     {items.length} {items.length === 1 ? "item" : "itens"}
                   </span>
                 </div>
-                {/* Grade Responsiva Lateral para Computador e Celular */}
                 <div style={{
                   display: "grid",
                   gridTemplateColumns: "repeat(auto-fill, minmax(230px, 1fr))",
@@ -350,72 +421,79 @@ function ShopContent() {
                 }}>
                   {items.map((ad, idx) => {
                     const isHighlighted = ad.id === highlightedAdId;
-                    const formattedPrice = ad.price ? `R$ ${ad.price.toFixed(2)}` : "A combinar";
-                    const imageText = ad.image_url ? ad.image_url : "Nenhuma foto informada";
+                    const formattedPrice = ad.price !== null ? `R$ ${ad.price.toFixed(2)}` : "A combinar";
+                    const imageText = ad.image_url ? ad.image_url : "";
                     const adLink = typeof window !== "undefined" ? `${window.location.origin}` : "";
-                    const marketMessage = `🚀 Estou vindo do *Conecta Cidade Sp* e tenho interesse neste produto:
-📦 ${ad.title}
-💰 ${formattedPrice}
-📝 Detalhes: ${ad.description || "Sem descrição"}
-🖼️ Foto do produto: ${imageText}
-🔗 Ver anúncio: ${adLink}`;
+                    
+                    const marketMessage = `🛍️ *Olá! Tenho interesse neste produto:*\n\n` +
+                      `📦 *Produto:* ${ad.title}\n` +
+                      `💰 *Preço:* ${formattedPrice}\n` +
+                      (ad.description ? `📝 *Detalhes:* ${ad.description}\n` : ``) +
+                      (imageText ? `\n📸 *Foto do Produto:* ${imageText}\n` : ``) +
+                      `\n🔗 *Página do Anúncio:* ${adLink}\n\n` +
+                      `_Enviado através do Conecta Cidade SP._`;
+
                     return (
                       <div
                         key={`${ad.id}-${idx}`}
                         ref={isHighlighted && idx === 0 ? targetAdRef : null}
+                        className="modern-product-card"
                         style={{
-                          border: isHighlighted ? `3px solid ${theme.primary}` : "1px solid #CBD5E1",
-                          borderRadius: "12px",
+                          border: isHighlighted ? `3px solid ${theme.primary}` : `2px solid ${theme.primary}50`,
+                          borderRadius: "16px",
                           overflow: "hidden",
-                          backgroundColor: "#fff",
                           display: "flex",
                           flexDirection: "column",
                           justifyContent: "space-between",
-                          boxShadow: isHighlighted ? "0 8px 25px rgba(0,0,0,0.15)" : "0 4px 12px rgba(0, 0, 0, 0.05)",
+                          boxShadow: isHighlighted ? "0 8px 25px rgba(0,0,0,0.15)" : "0 6px 18px rgba(0, 0, 0, 0.06)",
                           transform: isHighlighted ? "scale(1.02)" : "scale(1)",
-                          transition: "all 0.3s ease",
                           position: "relative",
                         }}
                       >
                         {isHighlighted && (
-                          <span style={{ position: "absolute", top: 10, left: 10, backgroundColor: theme.primary, color: "#fff", fontSize: "10px", fontWeight: "bold", padding: "4px 8px", borderRadius: "6px", zIndex: 1 }}>
+                          <span style={{ position: "absolute", top: 10, left: 10, backgroundColor: theme.primary, color: "#fff", fontSize: "10px", fontWeight: "bold", padding: "4px 8px", borderRadius: "6px", zIndex: 1, boxShadow: "0 2px 6px rgba(0,0,0,0.2)" }}>
                             ⚡ Em Destaque
                           </span>
                         )}
                         <div>
                           {ad.image_url ? (
-                            <div style={{ width: "100%", height: "180px", backgroundColor: "#F8FAFC", display: "flex", alignItems: "center", justifyContent: "center", padding: 10, borderBottom: "1px solid #F1F5F9" }}>
-                              <img src={ad.image_url} alt={ad.title} style={{ maxWidth: "100%", maxHeight: "100%", objectFit: "contain" }} />
+                            <div style={{ width: "100%", height: "185px", backgroundColor: "#FFFFFF", display: "flex", alignItems: "center", justifyContent: "center", padding: 10, borderBottom: `1px solid ${theme.primary}25`, boxSizing: "border-box" }}>
+                              <img src={ad.image_url} alt={ad.title} style={{ width: "100%", height: "100%", objectFit: "contain", objectPosition: "center" }} />
                             </div>
                           ) : (
-                            <div style={{ width: "100%", height: "180px", backgroundColor: "#F1F5F9", display: "flex", alignItems: "center", justifyContent: "center", color: "#94A3B8" }}>📷 Sem Foto</div>
+                            <div style={{ width: "100%", height: "185px", backgroundColor: "#FFFFFF", display: "flex", alignItems: "center", justifyContent: "center", color: "#94A3B8", fontSize: "13px", borderBottom: `1px solid ${theme.primary}25` }}>📷 Sem Foto</div>
                           )}
-                          <div style={{ padding: "14px" }}>
-                            <h3 className="title-clamp" style={{ fontSize: "15px", fontWeight: "bold", margin: "5px 0", color: "#1E293B", lineHeight: "1.3", height: "39px" }}>
+                          <div style={{ padding: "16px" }}>
+                            <h3 className="title-clamp" style={{ fontSize: "15px", fontWeight: "bold", margin: "0 0 6px 0", color: "#1E293B", lineHeight: "1.3", height: "39px" }}>
                               {ad.title}
                             </h3>
-                            <p className="desc-clamp" style={{ fontSize: "13px", color: "#64748B", margin: "5px 0 0 0", lineHeight: "1.3", height: "34px" }}>
-                              {ad.description}
+                            <p className="desc-clamp" style={{ fontSize: "13px", color: "#64748B", margin: 0, lineHeight: "1.3", height: "34px" }}>
+                              {ad.description || "Consulte os detalhes deste item."}
                             </p>
                           </div>
                         </div>
-                        <div style={{ padding: "14px", paddingTop: 0 }}>
-                          <p style={{ fontSize: "18px", fontWeight: "bold", color: theme.primary, margin: "10px 0" }}>
-                            {formattedPrice}
-                          </p>
+                        <div style={{ padding: "16px", paddingTop: 0 }}>
+                          <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: "12px", backgroundColor: `${theme.primary}15`, padding: "8px 12px", borderRadius: "10px", border: `1px solid ${theme.primary}35` }}>
+                            <span style={{ fontSize: "11px", fontWeight: "bold", color: theme.primary, textTransform: "uppercase", letterSpacing: "0.5px" }}>Valor</span>
+                            <span style={{ fontSize: "15px", fontWeight: "800", color: theme.primary }}>
+                              {formattedPrice}
+                            </span>
+                          </div>
                           {isFoodMode ? (
                             <button
                               onClick={() => addToCart(ad)}
                               style={{
                                 width: "100%",
-                                padding: "10px",
+                                padding: "12px",
                                 backgroundColor: theme.primary,
                                 color: "#fff",
                                 border: "none",
-                                borderRadius: "8px",
+                                borderRadius: "10px",
                                 fontWeight: "bold",
-                                fontSize: "12px",
+                                fontSize: "13px",
                                 cursor: "pointer",
+                                boxShadow: `0 4px 12px ${theme.primary}40`,
+                                transition: "filter 0.2s ease",
                               }}
                             >
                               🛒 Adicionar ao Pedido
@@ -425,9 +503,21 @@ function ShopContent() {
                               href={`https://wa.me/55${ad.whatsapp ? ad.whatsapp.replace(/\D/g, "") : ""}?text=${encodeURIComponent(marketMessage)}`}
                               target="_blank"
                               rel="noopener noreferrer"
-                              style={{ display: "block", textAlign: "center", padding: "10px", backgroundColor: "#22C55E", color: "#fff", borderRadius: "8px", textDecoration: "none", fontWeight: "bold", fontSize: "12px" }}
+                              style={{ 
+                                display: "block", 
+                                textAlign: "center", 
+                                padding: "12px", 
+                                backgroundColor: "#22C55E", 
+                                color: "#fff", 
+                                borderRadius: "10px", 
+                                textDecoration: "none", 
+                                fontWeight: "bold", 
+                                fontSize: "13px",
+                                boxShadow: "0 4px 12px rgba(34, 197, 94, 0.35)",
+                                transition: "all 0.2s ease"
+                              }}
                             >
-                              💬 Perguntar sobre este produto
+                              💬 Perguntar no WhatsApp
                             </a>
                           )}
                         </div>
@@ -440,7 +530,7 @@ function ShopContent() {
           })
         )}
       </main>
-      {/* CARRINHO FLUTUANTE */}
+
       {isFoodMode && cart.length > 0 && (
         <div
           onClick={() => setIsCartOpen(true)}
@@ -466,7 +556,7 @@ function ShopContent() {
           <span style={{ backgroundColor: "#15803D", padding: "4px 10px", borderRadius: "15px" }}>R$ {cartTotal.toFixed(2)}</span>
         </div>
       )}
-      {/* MODAL / GAVETA DO CARRINHO */}
+
       {isCartOpen && (
         <div style={{ position: "fixed", top: 0, left: 0, width: "100vw", height: "100vh", backgroundColor: "rgba(0,0,0,0.6)", zIndex: 9999, display: "flex", justifyContent: "flex-end" }}>
           <div style={{ width: "100%", maxWidth: "420px", backgroundColor: "#fff", height: "100%", padding: "20px", paddingBottom: "80px", display: "flex", flexDirection: "column", overflowY: "auto" }}>
@@ -474,7 +564,7 @@ function ShopContent() {
               <h2 style={{ fontSize: "20px", margin: 0, color: "#1E293B" }}>🛍️ Seu Pedido</h2>
               <button onClick={() => setIsCartOpen(false)} style={{ background: "none", border: "none", fontSize: "20px", cursor: "pointer" }}>✕</button>
             </div>
-            {/* LISTA DE ITENS */}
+            
             <div style={{ marginTop: "20px", display: "flex", flexDirection: "column", gap: "15px" }}>
               {cart.length === 0 ? (
                 <p style={{ color: "#64748B", textAlign: "center" }}>Seu carrinho está vazio.</p>
@@ -483,7 +573,9 @@ function ShopContent() {
                   <div key={item.ad.id} style={{ display: "flex", justifyContent: "space-between", alignItems: "center", borderBottom: "1px solid #F1F5F9", paddingBottom: "10px" }}>
                     <div>
                       <p style={{ margin: 0, fontWeight: "bold", fontSize: "14px", color: "#1E293B" }}>{item.ad.title}</p>
-                      <p style={{ margin: "2px 0 0 0", color: theme.primary, fontSize: "13px", fontWeight: "bold" }}>R$ {((item.ad.price || 0) * item.quantity).toFixed(2)}</p>
+                      <p style={{ margin: "2px 0 0 0", color: theme.primary, fontSize: "13px", fontWeight: "bold" }}>
+                        {item.ad.price !== null ? `R$ ${(item.ad.price * item.quantity).toFixed(2)}` : "A combinar"}
+                      </p>
                     </div>
                     <div style={{ display: "flex", alignItems: "center", gap: "8px" }}>
                       <button onClick={() => updateQuantity(item.ad.id, -1)} style={{ width: "28px", height: "28px", borderRadius: "50%", border: "1px solid #CBD5E1", background: "#F8FAFC", cursor: "pointer", fontWeight: "bold" }}>-</button>
@@ -495,24 +587,73 @@ function ShopContent() {
                 ))
               )}
             </div>
-            {/* DADOS DA ENTREGA */}
+
             {cart.length > 0 && (
               <div style={{ marginTop: "25px", marginBottom: "30px", display: "flex", flexDirection: "column", gap: "12px" }}>
                 <h3 style={{ fontSize: "15px", margin: 0, color: "#1E293B" }}>📋 Dados da Entrega</h3>
-                <input type="text" placeholder="Seu Nome" value={customerName} onChange={(e) => setCustomerName(e.target.value)} style={{ width: "100%", padding: "10px", borderRadius: "6px", border: "1px solid #CBD5E1", fontSize: "13px" }} />
-                <input type="text" placeholder="Endereço de Entrega (Rua, Nº, Bairro)" value={customerAddress} onChange={(e) => setCustomerAddress(e.target.value)} style={{ width: "100%", padding: "10px", borderRadius: "6px", border: "1px solid #CBD5E1", fontSize: "13px" }} />
-                <select value={paymentMethod} onChange={(e) => setPaymentMethod(e.target.value)} style={{ width: "100%", padding: "10px", borderRadius: "6px", border: "1px solid #CBD5E1", fontSize: "13px" }}>
+                
+                <div style={{ display: "flex", gap: "10px" }}>
+                  <button
+                    type="button"
+                    onClick={() => setDeliveryType("delivery")}
+                    style={{
+                      flex: 1, padding: "10px", borderRadius: "6px", fontSize: "13px", fontWeight: "bold", cursor: "pointer",
+                      border: deliveryType === "delivery" ? `2px solid ${theme.primary}` : "1px solid #CBD5E1",
+                      backgroundColor: deliveryType === "delivery" ? `${theme.primary}15` : "#fff",
+                      color: deliveryType === "delivery" ? theme.primary : "#64748B"
+                    }}
+                  >
+                    🚚 Entrega (+ R$ {(profile?.delivery_fee || 0).toFixed(2)})
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setDeliveryType("pickup")}
+                    style={{
+                      flex: 1, padding: "10px", borderRadius: "6px", fontSize: "13px", fontWeight: "bold", cursor: "pointer",
+                      border: deliveryType === "pickup" ? `2px solid ${theme.primary}` : "1px solid #CBD5E1",
+                      backgroundColor: deliveryType === "pickup" ? `${theme.primary}15` : "#fff",
+                      color: deliveryType === "pickup" ? theme.primary : "#64748B"
+                    }}
+                  >
+                    🏃 Retirada (Grátis)
+                  </button>
+                </div>
+                
+                <input type="text" placeholder="Seu Nome" value={customerName} onChange={(e) => setCustomerName(e.target.value)} style={{ width: "100%", padding: "10px", borderRadius: "6px", border: "1px solid #CBD5E1", fontSize: "13px", boxSizing: "border-box" }} />
+                
+                {deliveryType === "delivery" && (
+                  <>
+                    <div style={{ display: "flex", gap: "8px" }}>
+                      <input type="text" placeholder="Nome da Rua / Avenida" value={street} onChange={(e) => setStreet(e.target.value)} style={{ flex: 3, padding: "10px", borderRadius: "6px", border: "1px solid #CBD5E1", fontSize: "13px", boxSizing: "border-box" }} />
+                      <input type="text" placeholder="Nº" value={number} onChange={(e) => setNumber(e.target.value)} style={{ flex: 1, padding: "10px", borderRadius: "6px", border: "1px solid #CBD5E1", fontSize: "13px", boxSizing: "border-box" }} />
+                    </div>
+                    <input type="text" placeholder="Bairro / Complemento (Ex: Centro, Apto 24)" value={neighborhood} onChange={(e) => setNeighborhood(e.target.value)} style={{ width: "100%", padding: "10px", borderRadius: "6px", border: "1px solid #CBD5E1", fontSize: "13px", boxSizing: "border-box" }} />
+                  </>
+                )}
+                
+                <select value={paymentMethod} onChange={(e) => setPaymentMethod(e.target.value)} style={{ width: "100%", padding: "10px", borderRadius: "6px", border: "1px solid #CBD5E1", fontSize: "13px", boxSizing: "border-box" }}>
                   <option value="Pix">Pix</option>
                   <option value="Cartão de Crédito/Débito">Cartão de Crédito/Débito</option>
                   <option value="Dinheiro (com troco)">Dinheiro</option>
                 </select>
-                <input type="text" placeholder="Observações (ex: tirar cebola)" value={orderNotes} onChange={(e) => setOrderNotes(e.target.value)} style={{ width: "100%", padding: "10px", borderRadius: "6px", border: "1px solid #CBD5E1", fontSize: "13px" }} />
+                
+                <input type="text" placeholder="Observações (ex: tirar cebola)" value={orderNotes} onChange={(e) => setOrderNotes(e.target.value)} style={{ width: "100%", padding: "10px", borderRadius: "6px", border: "1px solid #CBD5E1", fontSize: "13px", boxSizing: "border-box" }} />
               </div>
             )}
-            {/* BOTÃO FIXADO DE FINALIZAR PEDIDO */}
+
             {cart.length > 0 && (
               <div style={{ borderTop: "2px solid #E2E8F0", paddingTop: "15px", marginTop: "auto", paddingBottom: "25px", backgroundColor: "#fff" }}>
-                <div style={{ display: "flex", justifyContent: "space-between", marginBottom: "12px", fontSize: "18px", fontWeight: "bold", color: "#1E293B" }}>
+                <div style={{ display: "flex", justifyContent: "space-between", marginBottom: "6px", fontSize: "14px", color: "#64748B" }}>
+                  <span>Subtotal:</span>
+                  <span>R$ {subtotal.toFixed(2)}</span>
+                </div>
+                {deliveryType === "delivery" && (
+                  <div style={{ display: "flex", justifyContent: "space-between", marginBottom: "6px", fontSize: "14px", color: "#64748B" }}>
+                    <span>Taxa de Entrega:</span>
+                    <span>R$ {deliveryFee.toFixed(2)}</span>
+                  </div>
+                )}
+                <div style={{ display: "flex", justifyContent: "space-between", marginBottom: "12px", fontSize: "18px", fontWeight: "bold", color: "#1E293B", borderTop: "1px dashed #CBD5E1", paddingTop: "8px" }}>
                   <span>Total:</span>
                   <span style={{ color: theme.primary }}>R$ {cartTotal.toFixed(2)}</span>
                 </div>

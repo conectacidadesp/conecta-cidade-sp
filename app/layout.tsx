@@ -1,9 +1,31 @@
 import Header from "@/components/Header";
+import InstallAppBanner from "@/components/InstallAppBanner";
 import Script from "next/script";
 
 export const metadata = {
   title: "Conecta Cidade SP",
   description: "Classificados da sua cidade",
+  appleWebApp: {
+    capable: true,
+    statusBarStyle: "default",
+    title: "Conecta Cidade SP",
+  },
+  openGraph: {
+    title: "Conecta Cidade SP",
+    description: "Sua plataforma completa de anúncios e serviços locais.",
+    url: "https://conectacidade.com.br",
+    siteName: "Conecta Cidade SP",
+    images: [
+      {
+        url: "https://ahiyxrdplhecskzoiogd.supabase.co/storage/v1/object/public/site-assets/Logo%20redonda.png",
+        width: 1200,
+        height: 630,
+        alt: "Conecta Cidade SP Logo",
+      },
+    ],
+    locale: "pt_BR",
+    type: "website",
+  },
 };
 
 export default function RootLayout({
@@ -13,14 +35,13 @@ export default function RootLayout({
 }) {
   // 🔹 Favicon atualizado com ?v=4 para forçar o navegador a atualizar e evitar conflito
   const faviconUrl = "https://ahiyxrdplhecskzoiogd.supabase.co/storage/v1/object/public/site-assets/Logo%20redonda.png?v=4";
-
+  
   return (
     <html lang="pt-BR">
       <head>
         <link rel="icon" href={faviconUrl} />
         <link rel="shortcut icon" href={faviconUrl} />
         <link rel="apple-touch-icon" href={faviconUrl} />
-
         {/* 📢 Google AdSense */}
         <meta name="google-adsense-account" content="ca-pub-3335848179325993" />
         <Script
@@ -29,7 +50,6 @@ export default function RootLayout({
           crossOrigin="anonymous"
           strategy="afterInteractive"
         />
-
         {/* 📊 Google Analytics (GA4) */}
         <Script
           strategy="afterInteractive"
@@ -53,11 +73,14 @@ export default function RootLayout({
         {/* 🔹 CABEÇALHO GLOBAL DINÂMICO */}
         <Header />
 
+        {/* 📲 BANNER DE INSTALAÇÃO DO PWA (APENAS CELULAR) */}
+        <InstallAppBanner />
+        
         {/* 🛒 CONTEÚDO DAS PÁGINAS */}
         <div style={{ flex: 1, padding: "20px 10px" }}>
           {children}
         </div>
-
+        
         {/* 🔻 RODAPÉ GLOBAL */}
         <footer style={{ backgroundColor: "#0F172A", color: "#94A3B8", padding: "40px 20px 20px", marginTop: "auto" }}>
           <div style={{ maxWidth: 1100, margin: "0 auto", display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(200px, 1fr))", gap: 30, marginBottom: 30 }}>
@@ -88,7 +111,6 @@ export default function RootLayout({
             © 2026 Conecta Cidade SP. Todos os direitos reservados.
           </div>
         </footer>
-
       </body>
     </html>
   );

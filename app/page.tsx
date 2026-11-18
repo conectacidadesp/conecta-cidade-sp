@@ -15,6 +15,8 @@ interface Ad {
   subcategory?: string | null;
   whatsapp: string;
   city: string;
+  cities?: string[] | null;
+  all_cities?: boolean;
   image_url: string | null;
   created_at: string;
   advertiser_name?: string | null;
@@ -26,6 +28,8 @@ interface Profile {
   store_name?: string;
   name?: string;
   city?: string;
+  cities?: string[] | null;
+  all_cities?: boolean;
   logo_url?: string;
   banner_url?: string;
   bio?: string;
@@ -74,22 +78,30 @@ export default function Home() {
     }
   }, [router]);
 
+  // 🧹 Limpeza automática de stories vencidos (> 24h) ao abrir o site
+  useEffect(() => {
+    async function cleanExpiredStories() {
+      await supabase.rpc("delete_expired_stories");
+    }
+    cleanExpiredStories();
+  }, []);
+
   useEffect(() => {
     async function fetchData() {
       setLoading(true);
-      
       const tenDaysAgo = new Date();
       tenDaysAgo.setDate(tenDaysAgo.getDate() - 10);
       const isoTenDaysAgo = tenDaysAgo.toISOString();
 
+      // Busca anúncios da cidade selecionada (via coluna legacy 'city', array 'cities' ou 'all_cities')
       const { data: adsData } = await supabase
         .from("ads")
         .select("*")
-        .eq("city", selectedCity)
+        .or(`city.eq."${selectedCity}",cities.cs.{"${selectedCity}"},all_cities.eq.true`)
         .gte("created_at", isoTenDaysAgo)
         .order("created_at", { ascending: false });
 
-      const loadedAds = (adsData || []).filter(ad => ad.show_in_classificados !== false);
+      const loadedAds = (adsData || []).filter((ad) => ad.show_in_classificados !== false);
       setAds(loadedAds);
 
       const { data: profilesData } = await supabase
@@ -99,7 +111,7 @@ export default function Home() {
       if (profilesData) {
         setProfiles(profilesData);
         const map: { [key: string]: Profile } = {};
-        profilesData.forEach(profile => {
+        profilesData.forEach((profile) => {
           map[profile.id] = profile;
         });
         setProfilesMap(map);
@@ -163,10 +175,9 @@ export default function Home() {
       }
       const nextAd = pool.splice(chosenIndex, 1)[0];
       balanced.push(nextAd);
-
       recentStoresCount.clear();
       const lastItems = balanced.slice(-2);
-      lastItems.forEach(item => {
+      lastItems.forEach((item) => {
         if (item.user_id) {
           recentStoresCount.set(item.user_id, (recentStoresCount.get(item.user_id) || 0) + 1);
         }
@@ -178,13 +189,24 @@ export default function Home() {
   const finalDisplayAds = getBalancedFeed(filteredAds);
   const relatedAds = ads.filter((ad) => !finalDisplayAds.some((f) => f.id === ad.id));
 
-  const filteredProfiles = profiles.filter(profile => {
+  const filteredProfiles = profiles.filter((profile) => {
     const sName = profile.store_name || profile.name || "";
-    
     if (sName.toLowerCase().startsWith("anunciante") || profile.user_type === "client") {
       return false;
     }
-    if (profile.city && profile.city.trim() !== "" && profile.city !== selectedCity) {
+
+    // Suporte multi-cidades para lojas (all_cities, array cities ou coluna city)
+    const servesSelectedCity =
+      profile.all_cities === true ||
+      (Array.isArray(profile.cities) && profile.cities.includes(selectedCity)) ||
+      profile.city === selectedCity;
+
+    const hasNoCityConfigured =
+      (!profile.city || profile.city.trim() === "" || profile.city === "Não informada") &&
+      (!Array.isArray(profile.cities) || profile.cities.length === 0) &&
+      !profile.all_cities;
+
+    if (!servesSelectedCity && !hasNoCityConfigured) {
       return false;
     }
     if (!activeSearch) return true;
@@ -202,8 +224,8 @@ export default function Home() {
         ad_id: reportingAd.id,
         reason: reportReason,
         details: reportDetails,
-        status: "pendente"
-      }
+        status: "pendente",
+      },
     ]);
     setSubmittingReport(false);
     if (error) {
@@ -223,17 +245,20 @@ export default function Home() {
     const storeBio = profile.bio && profile.bio !== "EMPTY" ? profile.bio : "Estabelecimento cadastrado no Conecta Cidade SP.";
 
     return (
-      <div key={profile.id} style={{ 
-        border: "1px solid #E2E8F0", 
-        borderRadius: 14, 
-        overflow: "hidden", 
-        backgroundColor: "#ffffff", 
-        display: "flex", 
-        flexDirection: "column", 
-        boxShadow: "0 10px 25px -5px rgba(0, 0, 0, 0.05), 0 8px 10px -6px rgba(0, 0, 0, 0.05)",
-        transition: "transform 0.2s ease, box-shadow 0.2s ease"
-      }}>
-        <div 
+      <div
+        key={profile.id}
+        style={{
+          border: "1px solid #E2E8F0",
+          borderRadius: 14,
+          overflow: "hidden",
+          backgroundColor: "#ffffff",
+          display: "flex",
+          flexDirection: "column",
+          boxShadow: "0 10px 25px -5px rgba(0, 0, 0, 0.05), 0 8px 10px -6px rgba(0, 0, 0, 0.05)",
+          transition: "transform 0.2s ease, box-shadow 0.2s ease",
+        }}
+      >
+        <div
           style={{ width: "100%", height: 110, backgroundColor: "#0088FF", position: "relative", cursor: storeBanner ? "pointer" : "default" }}
           onClick={() => storeBanner && setPreviewImage(storeBanner)}
         >
@@ -244,7 +269,7 @@ export default function Home() {
           )}
         </div>
         <div style={{ padding: "0 16px", position: "relative", marginTop: -35, display: "flex", alignItems: "flex-end", justifyContent: "space-between" }}>
-          <div 
+          <div
             style={{ width: 70, height: 70, borderRadius: "50%", border: "3px solid #ffffff", backgroundColor: "#F1F5F9", overflow: "hidden", boxShadow: "0 2px 8px rgba(0,0,0,0.15)", cursor: storeLogo ? "pointer" : "default" }}
             onClick={() => storeLogo && setPreviewImage(storeLogo)}
           >
@@ -257,19 +282,16 @@ export default function Home() {
         </div>
         <div style={{ padding: 16, flex: 1, display: "flex", flexDirection: "column", justifyContent: "space-between" }}>
           <div>
-            <h4 style={{ fontSize: 17, margin: "6px 0 4px", color: "#0B2545", fontWeight: "bold" }}>
-              {storeName}
-            </h4>
-            <p style={{ fontSize: 12, color: "#64748B", margin: "0 0 10px" }}>📍 {profile.city || selectedCity}</p>
-            <p style={{ fontSize: 13, color: "#334155", margin: "0 0 10px 0", lineHeight: "1.4" }}>
-              {storeBio}
+            <h4 style={{ fontSize: 17, margin: "6px 0 4px", color: "#0B2545", fontWeight: "bold" }}>{storeName}</h4>
+            <p style={{ fontSize: 12, color: "#64748B", margin: "0 0 10px" }}>
+              📍 {profile.all_cities ? "Todas as cidades" : profile.city || selectedCity}
             </p>
+            <p style={{ fontSize: 13, color: "#334155", margin: "0 0 10px 0", lineHeight: "1.4" }}>{storeBio}</p>
           </div>
-          
           <div style={{ marginTop: 16, display: "flex", flexDirection: "column", gap: 8 }}>
             <a
               href={`/shop/${profile.id}`}
-              style={{ display: "block", width: "100%", textAlign: "center", backgroundColor: "#0088FF", color: "#fff", padding: "10px", borderRadius: 8, textDecoration: "none", fontSize: 13, fontWeight: "bold", boxShadow: "0 2px 5px rgba(0, 136, 255, 0.3)" }}
+              style={{ display: "block", width: "100%", boxSizing: "border-box", textAlign: "center", backgroundColor: "#0088FF", color: "#fff", padding: "10px", borderRadius: 8, textDecoration: "none", fontSize: 13, fontWeight: "bold", boxShadow: "0 2px 5px rgba(0, 136, 255, 0.3)" }}
             >
               🏪 Ver Produtos / Anúncios
             </a>
@@ -278,7 +300,7 @@ export default function Home() {
                 href={`https://wa.me/55${storeWhatsapp.replace(/\D/g, "")}?text=${encodeURIComponent(`Olá ${storeName}, vi seu estabelecimento no Conecta Cidade SP e gostaria de mais informações.`)}`}
                 target="_blank"
                 rel="noreferrer"
-                style={{ display: "block", textAlign: "center", backgroundColor: "#22C55E", color: "#fff", padding: "10px", borderRadius: 8, textDecoration: "none", fontSize: 13, fontWeight: "bold", boxShadow: "0 2px 5px rgba(34, 197, 94, 0.3)" }}
+                style={{ display: "block", width: "100%", boxSizing: "border-box", textAlign: "center", backgroundColor: "#22C55E", color: "#fff", padding: "10px", borderRadius: 8, textDecoration: "none", fontSize: 13, fontWeight: "bold", boxShadow: "0 2px 5px rgba(34, 197, 94, 0.3)" }}
               >
                 💬 Chamar no WhatsApp
               </a>
@@ -291,10 +313,10 @@ export default function Home() {
 
   const renderAdCard = (ad: Ad) => {
     const storeProfile = ad.user_id ? profilesMap[ad.user_id] : null;
-    const storeNameRaw = storeProfile ? (storeProfile.store_name || storeProfile.name || "") : "";
-    
-    const isRealStore = storeProfile && 
-      storeProfile.user_type !== "client" && 
+    const storeNameRaw = storeProfile ? storeProfile.store_name || storeProfile.name || "" : "";
+    const isRealStore =
+      storeProfile &&
+      storeProfile.user_type !== "client" &&
       !storeNameRaw.toLowerCase().startsWith("anunciante");
     const storeName = isRealStore ? storeNameRaw : null;
     const isFoodStore = storeProfile?.store_type === "food";
@@ -310,74 +332,80 @@ export default function Home() {
 🔗 Ver anúncio: ${adLink}`;
 
     return (
-      <div key={ad.id} style={{ 
-        border: "1px solid #E2E8F0", 
-        borderRadius: 14, 
-        overflow: "hidden", 
-        backgroundColor: "#ffffff", 
-        display: "flex", 
-        flexDirection: "column", 
-        boxShadow: "0 10px 25px -5px rgba(0, 0, 0, 0.05), 0 8px 10px -6px rgba(0, 0, 0, 0.05)"
-      }}>
+      <div
+        key={ad.id}
+        style={{
+          border: "1px solid #E2E8F0",
+          borderRadius: 14,
+          overflow: "hidden",
+          backgroundColor: "#ffffff",
+          display: "flex",
+          flexDirection: "column",
+          boxShadow: "0 10px 25px -5px rgba(0, 0, 0, 0.05), 0 8px 10px -6px rgba(0, 0, 0, 0.05)",
+        }}
+      >
         {storeName && ad.user_id && (
           <a
             href={`/shop/${ad.user_id}`}
-            style={{ 
-              backgroundColor: "#0088FF", 
-              padding: "8px 10px", 
-              textAlign: "center", 
+            style={{
+              backgroundColor: "#0088FF",
+              padding: "8px 10px",
+              textAlign: "center",
               textDecoration: "none",
-              borderBottom: "1px solid #0066CC", 
-              width: "100%", 
-              display: "flex", 
-              alignItems: "center", 
-              justifyContent: "center", 
-              gap: 6 
+              borderBottom: "1px solid #0066CC",
+              width: "100%",
+              boxSizing: "border-box",
+              display: "flex",
+              alignItems: "center",
+              justifyContent: "center",
+              gap: 6,
             }}
           >
-            <span style={{ fontSize: 13, fontWeight: "bold", color: "#FFFFFF" }}>
-              🏪 {storeName}
-            </span>
+            <span style={{ fontSize: 13, fontWeight: "bold", color: "#FFFFFF" }}>🏪 {storeName}</span>
           </a>
         )}
         {hasCustomAdvertiser && (
           <div
-            style={{ 
-              backgroundColor: "#FFFFFF", 
-              padding: "8px 10px", 
-              textAlign: "center", 
-              borderBottom: "1px solid #E2E8F0", 
-              width: "100%", 
-              display: "flex", 
-              alignItems: "center", 
-              justifyContent: "center", 
-              gap: 6 
+            style={{
+              backgroundColor: "#FFFFFF",
+              padding: "8px 10px",
+              textAlign: "center",
+              borderBottom: "1px solid #E2E8F0",
+              width: "100%",
+              boxSizing: "border-box",
+              display: "flex",
+              alignItems: "center",
+              justifyContent: "center",
+              gap: 6,
             }}
           >
-            <span style={{ fontSize: 13, fontWeight: "bold", color: "#000000" }}>
-              👤 {ad.advertiser_name}
-            </span>
+            <span style={{ fontSize: 13, fontWeight: "bold", color: "#000000" }}>👤 {ad.advertiser_name}</span>
           </div>
         )}
-        <div 
+        {/* 🌟 ESTILO PROFISSIONAL MERCADO LIVRE (Fundo Branco + contain para zero cortes) */}
+        <div
           onClick={() => ad.image_url && setPreviewImage(ad.image_url)}
-          style={{ 
-            width: "100%", 
-            height: 160, 
-            backgroundColor: "#F8FAFC", 
-            display: "flex", 
-            alignItems: "center", 
-            justifyContent: "center", 
-            overflow: "hidden", 
-            borderBottom: "1px solid #F1F5F9", 
+          style={{
+            width: "100%",
+            height: 180,
+            backgroundColor: "#FFFFFF",
+            display: "flex",
+            alignItems: "center",
+            justifyContent: "center",
+            overflow: "hidden",
+            borderBottom: "1px solid #F1F5F9",
             position: "relative",
-            cursor: ad.image_url ? "pointer" : "default"
+            padding: "8px",
+            boxSizing: "border-box",
+            cursor: ad.image_url ? "pointer" : "default",
           }}
         >
           {ad.image_url ? (
             <>
-              <img src={ad.image_url} alt={ad.title} style={{ width: "100%", height: "100%", objectFit: "cover", objectPosition: "center" }} />
-              <span style={{ position: "absolute", bottom: 6, right: 6, backgroundColor: "rgba(0,0,0,0.6)", color: "#fff", padding: "2px 6px", borderRadius: 4, fontSize: 10 }}>🔍 Zoom</span>
+              <img src={ad.image_url} alt={ad.title} style={{ width: "100%", height: "100%", objectFit: "contain", objectPosition: "center" }} />
+              <span style={{ position: "absolute", bottom: 6, right: 6, backgroundColor: "rgba(0,0,0,0.6)", color: "#fff", padding: "2px 6px", borderRadius: 4, fontSize: 10 }}>
+                🔍 Zoom
+              </span>
             </>
           ) : (
             <span style={{ color: "#94A3B8", fontSize: 14 }}>Sem Foto</span>
@@ -388,34 +416,28 @@ export default function Home() {
             <span style={{ fontSize: 10, backgroundColor: "#FFEDD5", color: "#C2410C", padding: "2px 8px", borderRadius: 6, fontWeight: "bold", display: "inline-block" }}>
               {ad.category}
             </span>
-            <h4 style={{ fontSize: 14, margin: "8px 0 4px", color: "#0B2545", fontWeight: "bold", lineHeight: "1.2" }}>
-              {ad.title}
-            </h4>
-            <p style={{ fontSize: 12, color: "#64748B", margin: "0 0 8px 0", lineHeight: "1.3", wordBreak: "break-word" }}>
-              {ad.description}
-            </p>
+            <h4 style={{ fontSize: 14, margin: "8px 0 4px", color: "#0B2545", fontWeight: "bold", lineHeight: "1.2" }}>{ad.title}</h4>
+            <p style={{ fontSize: 12, color: "#64748B", margin: "0 0 8px 0", lineHeight: "1.3", wordBreak: "break-word" }}>{ad.description}</p>
           </div>
-          
           <div style={{ marginTop: 10 }}>
-            <p style={{ fontSize: 16, fontWeight: "bold", color: "#0088FF", margin: "0 0 8px" }}>
-              {formattedPrice}
-            </p>
+            <p style={{ fontSize: 16, fontWeight: "bold", color: "#0088FF", margin: "0 0 8px" }}>{formattedPrice}</p>
             {isFoodStore && ad.user_id ? (
               <a
                 href={`/shop/${ad.user_id}?ad=${ad.id}`}
-                style={{ 
-                  display: "block", 
-                  width: "100%", 
-                  textAlign: "center", 
-                  backgroundColor: "#F97316", 
-                  color: "#fff", 
-                  padding: "8px", 
-                  borderRadius: 8, 
-                  textDecoration: "none", 
-                  fontSize: 12, 
-                  fontWeight: "bold", 
-                  marginBottom: 6, 
-                  boxShadow: "0 2px 5px rgba(249, 115, 22, 0.3)" 
+                style={{
+                  display: "block",
+                  width: "100%",
+                  boxSizing: "border-box",
+                  textAlign: "center",
+                  backgroundColor: "#F97316",
+                  color: "#fff",
+                  padding: "8px",
+                  borderRadius: 8,
+                  textDecoration: "none",
+                  fontSize: 12,
+                  fontWeight: "bold",
+                  marginBottom: 6,
+                  boxShadow: "0 2px 5px rgba(249, 115, 22, 0.3)",
                 }}
               >
                 🍽️ Ver Cardápio da Loja
@@ -425,14 +447,14 @@ export default function Home() {
                 href={`https://wa.me/55${ad.whatsapp.replace(/\D/g, "")}?text=${encodeURIComponent(whatsappMessage)}`}
                 target="_blank"
                 rel="noreferrer"
-                style={{ display: "block", textAlign: "center", backgroundColor: "#22C55E", color: "#fff", padding: "8px", borderRadius: 8, textDecoration: "none", fontSize: 12, fontWeight: "bold", marginBottom: 6 }}
+                style={{ display: "block", width: "100%", boxSizing: "border-box", textAlign: "center", backgroundColor: "#22C55E", color: "#fff", padding: "8px", borderRadius: 8, textDecoration: "none", fontSize: 12, fontWeight: "bold", marginBottom: 6 }}
               >
                 💬 WhatsApp
               </a>
             )}
             <button
               onClick={() => setReportingAd(ad)}
-              style={{ width: "100%", background: "none", border: "1px solid #E2E8F0", borderRadius: 6, padding: "5px", cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "center", gap: 4, fontSize: 11, color: "#64748B", fontWeight: 500 }}
+              style={{ width: "100%", boxSizing: "border-box", background: "none", border: "1px solid #E2E8F0", borderRadius: 6, padding: "5px", cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "center", gap: 4, fontSize: 11, color: "#64748B", fontWeight: 500 }}
             >
               <span>🚩</span> Denunciar anúncio
             </button>
@@ -470,7 +492,6 @@ export default function Home() {
           }
         }
       `}</style>
-
       <section style={{ backgroundColor: "#0F4C81", color: "#fff", padding: "30px 20px", textAlign: "center", borderRadius: 8, marginBottom: 20, boxShadow: "0 4px 15px rgba(15,76,129,0.2)" }}>
         <div style={{ maxWidth: 650, margin: "0 auto" }}>
           <h2 style={{ margin: "0 0 15px", fontSize: 22 }}>Encontre tudo o que precisa na sua cidade</h2>
@@ -505,9 +526,7 @@ export default function Home() {
           </form>
         </div>
       </section>
-
       <StoriesBar selectedCity={selectedCity} />
-
       <section style={{ backgroundColor: "#fff", border: "1px solid #E2E8F0", borderRadius: 8, padding: "15px 0", marginBottom: 30, marginTop: 20 }}>
         <div style={{ maxWidth: 1100, margin: "0 auto", display: "flex", gap: 15, overflowX: "auto", padding: "0 20px" }}>
           {CATEGORIES.map((cat) => (
@@ -524,22 +543,24 @@ export default function Home() {
                 opacity: selectedCategory === cat.name ? 1 : 0.6,
                 transform: selectedCategory === cat.name ? "scale(1.05)" : "scale(1)",
                 transition: "all 0.2s",
-                minWidth: 80
+                minWidth: 80,
               }}
             >
-              <div style={{
-                width: 50,
-                height: 50,
-                borderRadius: "50%",
-                backgroundColor: selectedCategory === cat.name ? "#0088FF" : "#F1F5F9",
-                color: selectedCategory === cat.name ? "#fff" : "#000",
-                display: "flex",
-                alignItems: "center",
-                justifyContent: "center",
-                fontSize: 20,
-                marginBottom: 4,
-                boxShadow: selectedCategory === cat.name ? "0 2px 8px rgba(0,136,255,0.4)" : "none"
-              }}>
+              <div
+                style={{
+                  width: 50,
+                  height: 50,
+                  borderRadius: "50%",
+                  backgroundColor: selectedCategory === cat.name ? "#0088FF" : "#F1F5F9",
+                  color: selectedCategory === cat.name ? "#fff" : "#000",
+                  display: "flex",
+                  alignItems: "center",
+                  justifyContent: "center",
+                  fontSize: 20,
+                  marginBottom: 4,
+                  boxShadow: selectedCategory === cat.name ? "0 2px 8px rgba(0,136,255,0.4)" : "none",
+                }}
+              >
                 {cat.icon}
               </div>
               <span style={{ fontSize: 12, fontWeight: selectedCategory === cat.name ? "bold" : "normal", color: "#334155", textAlign: "center" }}>
@@ -549,7 +570,6 @@ export default function Home() {
           ))}
         </div>
       </section>
-
       <main style={{ maxWidth: 1100, margin: "0 auto", paddingBottom: 40, paddingLeft: 10, paddingRight: 10 }}>
         <h3 style={{ margin: "0 0 20px", color: "#0B2545", fontSize: 18, borderLeft: "4px solid #F97316", paddingLeft: 10 }}>
           {selectedCategory === "Comércio Local"
@@ -560,16 +580,13 @@ export default function Home() {
             ? `Todos os Anúncios em ${selectedCity}`
             : `Anúncios de ${selectedCategory} em ${selectedCity}`}
         </h3>
-
         {loading ? (
           <p style={{ textAlign: "center", color: "#64748B", margin: "40px 0" }}>Carregando dados...</p>
         ) : (
           <>
             {selectedCategory === "Comércio Local" ? (
               filteredProfiles.length > 0 ? (
-                <div className="ads-grid-container">
-                  {filteredProfiles.map(renderProfileCard)}
-                </div>
+                <div className="ads-grid-container">{filteredProfiles.map(renderProfileCard)}</div>
               ) : (
                 <div style={{ textAlign: "center", padding: 30, backgroundColor: "#fff", border: "1px dashed #CBD5E1", borderRadius: 8, marginBottom: 30 }}>
                   <p style={{ color: "#64748B", fontSize: 16, margin: 0 }}>Nenhum comércio cadastrado encontrado nesta cidade.</p>
@@ -597,15 +614,12 @@ export default function Home() {
                     <p style={{ color: "#64748B", fontSize: 16, margin: 0 }}>Nenhum anúncio encontrado para esta busca específica.</p>
                   </div>
                 )}
-
                 {(finalDisplayAds.length === 0 || activeSearch !== "") && relatedAds.length > 0 && (
                   <div style={{ marginTop: 40 }}>
                     <h4 style={{ color: "#0088FF", fontSize: 16, marginBottom: 15, borderBottom: "2px solid #E2E8F0", paddingBottom: 8 }}>
                       💡 Veja anúncios relacionados em {selectedCity}
                     </h4>
-                    <div className="ads-grid-container">
-                      {relatedAds.map(renderAdCard)}
-                    </div>
+                    <div className="ads-grid-container">{relatedAds.map(renderAdCard)}</div>
                   </div>
                 )}
               </>
@@ -616,7 +630,7 @@ export default function Home() {
 
       {/* 🔍 MODAL DE VISUALIZAÇÃO DE IMAGEM EM TELA CHEIA (ZOOM 100% CENTRALIZADO) */}
       {previewImage && (
-        <div 
+        <div
           onClick={() => setPreviewImage(null)}
           style={{
             position: "fixed",
@@ -631,10 +645,10 @@ export default function Home() {
             zIndex: 999999,
             padding: "16px",
             boxSizing: "border-box",
-            cursor: "zoom-out"
+            cursor: "zoom-out",
           }}
         >
-          <button 
+          <button
             onClick={() => setPreviewImage(null)}
             style={{
               position: "fixed",
@@ -653,43 +667,58 @@ export default function Home() {
               zIndex: 1000000,
               display: "flex",
               alignItems: "center",
-              justifyContent: "center"
+              justifyContent: "center",
             }}
           >
             ✕
           </button>
-          <img 
-            src={previewImage} 
-            alt="Ampliada" 
+          <img
+            src={previewImage}
+            alt="Ampliada"
             style={{
               maxWidth: "90vw",
               maxHeight: "85vh",
               objectFit: "contain",
               borderRadius: "8px",
-              boxShadow: "0 4px 25px rgba(0,0,0,0.8)"
-            }} 
+              boxShadow: "0 4px 25px rgba(0,0,0,0.8)",
+            }}
           />
         </div>
       )}
 
       {reportingAd && (
-        <div style={{ 
-          position: "fixed", top: 0, left: 0, width: "100vw", height: "100vh", 
-          backgroundColor: "rgba(0,0,0,0.6)", display: "flex", alignItems: "center", justifyContent: "center", zIndex: 9999, padding: "16px",
-          boxSizing: "border-box"
-        }}>
-          <div style={{ 
-            backgroundColor: "#fff", 
-            borderRadius: 12, 
-            padding: "20px", 
-            width: "100%", 
-            maxWidth: 450, 
-            boxShadow: "0 10px 25px rgba(0,0,0,0.2)",
+        <div
+          style={{
+            position: "fixed",
+            top: 0,
+            left: 0,
+            width: "100vw",
+            height: "100vh",
+            backgroundColor: "rgba(0,0,0,0.6)",
+            display: "flex",
+            alignItems: "center",
+            justifyContent: "center",
+            zIndex: 9999,
+            padding: "16px",
             boxSizing: "border-box",
-            margin: "0 16px"
-          }}>
+          }}
+        >
+          <div
+            style={{
+              backgroundColor: "#fff",
+              borderRadius: 12,
+              padding: "20px",
+              width: "100%",
+              maxWidth: 450,
+              boxShadow: "0 10px 25px rgba(0,0,0,0.2)",
+              boxSizing: "border-box",
+              margin: "0 16px",
+            }}
+          >
             <h3 style={{ margin: "0 0 10px", color: "#1E293B", fontSize: 18 }}>Denunciar Anúncio</h3>
-            <p style={{ fontSize: 13, color: "#64748B", margin: "0 0 15px", wordBreak: "word-wrap" }}>Anúncio: <strong>{reportingAd.title}</strong></p>
+            <p style={{ fontSize: 13, color: "#64748B", margin: "0 0 15px", wordBreak: "break-word" }}>
+              Anúncio: <strong>{reportingAd.title}</strong>
+            </p>
             <form onSubmit={handleSendReport}>
               <div style={{ marginBottom: 15 }}>
                 <label style={{ display: "block", fontSize: 13, fontWeight: "bold", marginBottom: 5, color: "#334155" }}>Motivo:</label>

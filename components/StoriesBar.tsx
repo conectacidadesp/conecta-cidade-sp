@@ -1,5 +1,4 @@
 "use client";
-
 import { useEffect, useState, useRef } from "react";
 import { supabase } from "@/lib/supabase";
 
@@ -30,14 +29,14 @@ interface GroupedStore {
 export default function StoriesBar({ selectedCity }: { selectedCity?: string }) {
   const [groupedStores, setGroupedStores] = useState<GroupedStore[]>([]);
   const [loading, setLoading] = useState(true);
-
+  
   // Estados para o Modal de Visualização
   const [activeStoreIndex, setActiveStoreIndex] = useState<number | null>(null);
   const [currentStoryIndex, setCurrentStoryIndex] = useState(0);
-
+  
   // Armazena IDs dos stories assistidos no navegador
   const [viewedStoryIds, setViewedStoryIds] = useState<string[]>([]);
-
+  
   // Ref do timer para avançar automaticamente
   const timerRef = useRef<NodeJS.Timeout | null>(null);
 
@@ -56,7 +55,6 @@ export default function StoriesBar({ selectedCity }: { selectedCity?: string }) 
   useEffect(() => {
     async function loadStories() {
       setLoading(true);
-
       let query = supabase
         .from("stories")
         .select(`
@@ -106,7 +104,6 @@ export default function StoriesBar({ selectedCity }: { selectedCity?: string }) 
 
         // Agrupa os stories por loja
         const storeMap = new Map<string, GroupedStore>();
-
         rawStories.forEach((story) => {
           const storeName = story.profiles?.store_name || "Loja Local";
           const logoUrl = story.profiles?.logo_url || story.image_url;
@@ -134,7 +131,6 @@ export default function StoriesBar({ selectedCity }: { selectedCity?: string }) 
       }
       setLoading(false);
     }
-
     loadStories();
   }, [selectedCity]);
 
@@ -232,6 +228,23 @@ export default function StoriesBar({ selectedCity }: { selectedCity?: string }) 
 
   return (
     <div style={{ width: "100%", backgroundColor: "#fff", padding: "15px 0", borderBottom: "1px solid #E2E8F0" }}>
+      {/* Estilo CSS Global injetado para a transição suave de fade */}
+      <style jsx global>{`
+        @keyframes storyFade {
+          from {
+            opacity: 0.2;
+            transform: scale(0.97);
+          }
+          to {
+            opacity: 1;
+            transform: scale(1);
+          }
+        }
+        .story-transition {
+          animation: storyFade 0.35s ease-in-out;
+        }
+      `}</style>
+
       <div style={{ maxWidth: 1200, margin: "0 auto", padding: "0 15px" }}>
         <p style={{ fontSize: 12, fontWeight: "bold", color: "#64748B", textTransform: "uppercase", letterSpacing: "0.5px", marginBottom: 10 }}>
           ⚡ Destaques das Lojas {selectedCity ? `em ${selectedCity}` : ""}
@@ -240,9 +253,7 @@ export default function StoriesBar({ selectedCity }: { selectedCity?: string }) 
         {/* Carrossel de Ícones por Loja */}
         <div style={{ display: "flex", gap: 16, overflowX: "auto", paddingBottom: 8, scrollbarWidth: "none" }}>
           {sortedStores.map((store, index) => {
-            // Verifica se a loja possui algum story não assistido
             const hasUnwatched = store.stories.some(s => !viewedStoryIds.includes(s.id));
-
             return (
               <div
                 key={store.storeKey}
@@ -262,7 +273,6 @@ export default function StoriesBar({ selectedCity }: { selectedCity?: string }) 
                     height: 64,
                     borderRadius: "50%",
                     padding: 3,
-                    // Se foi assistido, remove o gradiente/círculo vermelho e deixa cinza discreto ou sem destaque
                     background: hasUnwatched
                       ? "linear-gradient(45deg, #f09433, #e6683c 25%, #dc2743 50%, #cc2366 75%, #bc1888 100%)"
                       : "#CBD5E1",
@@ -306,7 +316,7 @@ export default function StoriesBar({ selectedCity }: { selectedCity?: string }) 
         </div>
       </div>
 
-      {/* Modal / Carrossel de Stories */}
+      {/* Modal / Carrossel de Stories com Transição Suave entre Lojas e Imagens */}
       {activeStore && currentStory && (
         <div
           onClick={() => setActiveStoreIndex(null)}
@@ -326,6 +336,8 @@ export default function StoriesBar({ selectedCity }: { selectedCity?: string }) 
           }}
         >
           <div
+            key={activeStore.storeKey} // 🌟 Faz o modal inteiro transicionar suavemente ao mudar de usuário/loja
+            className="story-transition"
             onClick={(e) => e.stopPropagation()}
             style={{
               backgroundColor: "#1E293B",
@@ -375,28 +387,32 @@ export default function StoriesBar({ selectedCity }: { selectedCity?: string }) 
               </button>
             </div>
 
-            {/* Imagem + Controles */}
-            <div style={{ position: "relative", width: "100%", height: "320px", backgroundColor: "#000", display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0 }}>
+            {/* Imagem com Transição Suave + Controles */}
+            <div style={{ position: "relative", width: "100%", height: "320px", backgroundColor: "#000", display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0, overflow: "hidden" }}>
               <img
+                key={currentStory.id} // Dispara a animação de fade ao trocar de imagem
                 src={currentStory.image_url}
                 alt="Story"
+                className="story-transition"
                 style={{ width: "100%", height: "100%", objectFit: "contain", objectPosition: "center" }}
               />
-
               <div
                 onClick={handlePrevStory}
-                style={{ position: "absolute", left: 0, top: 0, width: "35%", height: "100%", cursor: "pointer" }}
+                style={{ position: "absolute", left: 0, top: 0, width: "35%", height: "100%", cursor: "pointer", zIndex: 2 }}
               />
-
               <div
                 onClick={handleNextStory}
-                style={{ position: "absolute", right: 0, top: 0, width: "35%", height: "100%", cursor: "pointer" }}
+                style={{ position: "absolute", right: 0, top: 0, width: "35%", height: "100%", cursor: "pointer", zIndex: 2 }}
               />
             </div>
 
             {/* Rodapé / Ação com o Título Real do Produto */}
             <div style={{ padding: 15, textAlign: "center", flexShrink: 0 }}>
-              <p style={{ margin: "0 0 12px 0", fontSize: 14, fontWeight: "bold", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
+              <p 
+                key={`title-${currentStory.id}`}
+                className="story-transition"
+                style={{ margin: "0 0 12px 0", fontSize: 14, fontWeight: "bold", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}
+              >
                 {currentStory.title || "Produto em Destaque"}
               </p>
               <button

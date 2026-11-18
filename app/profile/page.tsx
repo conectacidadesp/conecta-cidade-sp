@@ -1,5 +1,4 @@
 "use client";
-
 import { useEffect, useState } from "react";
 import { supabase } from "@/lib/supabase";
 
@@ -17,6 +16,11 @@ interface Ad {
   show_in_classificados?: boolean;
   user_id?: string;
 }
+
+const CITIES_LIST = [
+  "Rubiácea-SP",
+  "Guararapes-SP",
+];
 
 const FONT_OPTIONS = [
   { id: "sans", name: "Sans-serif (Moderno & Limpo)", family: "system-ui, -apple-system, sans-serif" },
@@ -48,10 +52,15 @@ export default function ProfileDashboard() {
   
   // Dados Básicos da Loja
   const [storeName, setStoreName] = useState("");
-  const [city, setCity] = useState("");
+  const [city, setCity] = useState("Rubiácea-SP");
+  const [selectedCities, setSelectedCities] = useState<string[]>([]);
+  const [allCities, setAllCities] = useState(false);
   const [bio, setBio] = useState("");
   const [whatsapp, setWhatsapp] = useState("");
   const [storeType, setStoreType] = useState<"marketplace" | "food">("marketplace");
+  const [deliveryFeeDisplay, setDeliveryFeeDisplay] = useState(""); // 👈 Exibição formatada da taxa de entrega
+  const [rawDeliveryFee, setRawDeliveryFee] = useState<number | null>(0); // 👈 Valor numérico para salvar
+
   const [currentLogoUrl, setCurrentLogoUrl] = useState<string | null>(null);
   const [logoFile, setLogoFile] = useState<File | null>(null);
 
@@ -72,8 +81,6 @@ export default function ProfileDashboard() {
   const [loading, setLoading] = useState(false);
   const [fetching, setFetching] = useState(true);
   const [user, setUser] = useState<any>(null);
-
-  const availableCities = ["Rubiácea-SP", "Guararapes-SP"];
 
   useEffect(() => {
     async function loadDashboardData() {
@@ -102,17 +109,28 @@ export default function ProfileDashboard() {
       const type = isClientUser ? "client" : (profileData?.user_type || "store");
       
       setUserType(type);
-
       if (type === "client") {
         setActiveTab("anuncios");
       }
 
       if (profileData) {
         setStoreName(profileData.store_name || "");
-        setCity(profileData.city || "");
+        setCity(profileData.city || "Rubiácea-SP");
+        setSelectedCities(profileData.cities || [profileData.city || "Rubiácea-SP"]);
+        setAllCities(profileData.all_cities || false);
         setBio(profileData.bio || "");
         setWhatsapp(profileData.whatsapp || "");
         setStoreType(profileData.store_type || "marketplace");
+        
+        // Carrega a Taxa de Entrega
+        if (profileData.delivery_fee !== null && profileData.delivery_fee !== undefined) {
+          setRawDeliveryFee(profileData.delivery_fee);
+          setDeliveryFeeDisplay(profileData.delivery_fee.toLocaleString("pt-BR", { style: "currency", currency: "BRL" }));
+        } else {
+          setDeliveryFeeDisplay("");
+          setRawDeliveryFee(0);
+        }
+
         setCurrentLogoUrl(profileData.logo_url || null);
         setThemeColor(profileData.theme_color || "blue");
         setFontStyle(profileData.font_style || "sans");
@@ -130,7 +148,6 @@ export default function ProfileDashboard() {
       }
 
       setLoadingAds(true);
-
       const { data: adsData, error: adsError } = await supabase
         .from("ads")
         .select("*")
@@ -144,12 +161,10 @@ export default function ProfileDashboard() {
           .eq("profile_id", user.id);
 
         const featuredAdIds = new Set(storiesData?.map(s => s.ad_id) || []);
-
         const formattedAds: Ad[] = adsData.map(ad => ({
           ...ad,
           is_featured: featuredAdIds.has(ad.id)
         }));
-
         setMyAds(formattedAds);
       } else {
         setMyAds([]);
@@ -158,16 +173,39 @@ export default function ProfileDashboard() {
       setLoadingAds(false);
       setFetching(false);
     }
-
     loadDashboardData();
   }, []);
+
+  // 💰 Máscara Monetária Automática para a Taxa de Entrega
+  const handleDeliveryFeeChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const valueOnly = e.target.value.replace(/\D/g, "");
+    if (!valueOnly) {
+      setDeliveryFeeDisplay("");
+      setRawDeliveryFee(0);
+      return;
+    }
+    const numericValue = parseInt(valueOnly, 10) / 100;
+    setRawDeliveryFee(numericValue);
+    const formatted = numericValue.toLocaleString("pt-BR", {
+      style: "currency",
+      currency: "BRL",
+    });
+    setDeliveryFeeDisplay(formatted);
+  };
+
+  const handleCityToggle = (cityName: string) => {
+    if (selectedCities.includes(cityName)) {
+      setSelectedCities(selectedCities.filter((c) => c !== cityName));
+    } else {
+      setSelectedCities([...selectedCities, cityName]);
+    }
+  };
 
   const handleSaveProfile = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!user) return;
-
-    if (!city) {
-      alert("Por favor, selecione a cidade!");
+    if (!allCities && selectedCities.length === 0) {
+      alert("⚠️ Selecione pelo menos uma cidade ou marque a opção 'Todas as cidades'.");
       return;
     }
 
@@ -179,7 +217,6 @@ export default function ProfileDashboard() {
       const fileExt = logoFile.name.split('.').pop();
       const fileName = `${user.id}-logo-${Math.random()}.${fileExt}`;
       const filePath = `logos/${fileName}`;
-
       const { error: uploadError } = await supabase.storage
         .from("ads-images")
         .upload(filePath, logoFile, { upsert: true });
@@ -194,7 +231,6 @@ export default function ProfileDashboard() {
       const fileExt = bannerFile.name.split('.').pop();
       const fileName = `${user.id}-banner-${Math.random()}.${fileExt}`;
       const filePath = `banners/${fileName}`;
-
       const { error: uploadError } = await supabase.storage
         .from("ads-images")
         .upload(filePath, bannerFile, { upsert: true });
@@ -211,14 +247,18 @@ export default function ProfileDashboard() {
       user.email?.endsWith("@client.conectacidade.local") || 
       user.phone;
 
-    // 🔹 CORREÇÃO AQUI: Incluído o font_style para salvar perfeitamente no Supabase
+    const primaryCity = selectedCities[0] || city || "Rubiácea-SP";
+
     const profileData: any = {
       id: user.id,
       store_name: storeName,
-      city: city,
+      city: primaryCity,
+      cities: selectedCities,
+      all_cities: allCities,
       bio: bio,
       whatsapp: whatsapp,
       store_type: storeType,
+      delivery_fee: rawDeliveryFee || 0, // 👈 Salva a taxa de entrega no Supabase
       logo_url: uploadedLogoUrl,
       theme_color: themeColor,
       font_style: fontStyle, 
@@ -229,7 +269,6 @@ export default function ProfileDashboard() {
     };
 
     const { error } = await supabase.from("profiles").upsert(profileData);
-
     setLoading(false);
 
     if (error) {
@@ -243,9 +282,7 @@ export default function ProfileDashboard() {
 
   const handleDeleteAd = async (adId: string, adTitle: string) => {
     if (!window.confirm(`Excluir permanentemente o anúncio "${adTitle}"?`)) return;
-
     const { error } = await supabase.from("ads").delete().eq("id", adId);
-
     if (!error) {
       setMyAds(myAds.filter(ad => ad.id !== adId));
       alert("Anúncio removido!");
@@ -256,7 +293,6 @@ export default function ProfileDashboard() {
 
   const handleMarkAsSold = async (adId: string, adTitle: string) => {
     if (!window.confirm(`Marcar "${adTitle}" como vendido? O anúncio será encerrado e removido do seu painel.`)) return;
-
     try {
       await supabase.from("sales_stats").insert([
         { user_id: user.id, ad_id: adId, title: adTitle, sold_at: new Date().toISOString() }
@@ -264,7 +300,6 @@ export default function ProfileDashboard() {
     } catch (e) {}
 
     const { error } = await supabase.from("ads").delete().eq("id", adId);
-
     if (!error) {
       setMyAds(myAds.filter(ad => ad.id !== adId));
       alert("Parabéns pela venda! O anúncio foi encerrado com sucesso.");
@@ -282,7 +317,6 @@ export default function ProfileDashboard() {
     }
 
     const { error } = await supabase.from("ads").update(updatePayload).eq("id", adId);
-
     if (!error) {
       setMyAds(myAds.map(a => a.id === adId ? { ...a, show_in_classificados: newState, created_at: newState ? new Date().toISOString() : a.created_at } : a));
       alert(newState ? "Produto anunciado nos classificados com sucesso!" : "Produto retirado dos classificados (continua visível na sua vitrine).");
@@ -294,7 +328,6 @@ export default function ProfileDashboard() {
   const handleRenewAd = async (adId: string) => {
     const newDate = new Date().toISOString();
     const { error } = await supabase.from("ads").update({ created_at: newDate, show_in_classificados: true }).eq("id", adId);
-
     if (!error) {
       setMyAds(myAds.map(a => a.id === adId ? { ...a, created_at: newDate, show_in_classificados: true } : a));
       alert("Anúncio renovado com sucesso e enviado para o topo da home!");
@@ -403,7 +436,6 @@ export default function ProfileDashboard() {
         ) : null}
 
         <div style={{ padding: 25 }}>
-
           {userType === "store" && activeTab === "perfil" && (
             <form onSubmit={handleSaveProfile} style={{ display: "flex", flexDirection: "column", gap: 18, maxWidth: 600 }}>
               <h2 style={{ fontSize: 20, margin: 0, fontWeight: "bold", color: "#1E293B" }}>Identidade do Comércio</h2>
@@ -431,17 +463,35 @@ export default function ProfileDashboard() {
                 </select>
               </div>
 
-              <div>
-                <label style={{ display: "block", fontSize: 13, fontWeight: "bold", marginBottom: 6 }}>Cidade Base:</label>
-                <select
-                  value={city}
-                  onChange={(e) => setCity(e.target.value)}
-                  required
-                  style={{ width: "100%", padding: 12, border: "1px solid #CBD5E1", borderRadius: 6, fontSize: 14, backgroundColor: "#fff" }}
-                >
-                  <option value="">-- Selecione a Cidade --</option>
-                  {availableCities.map((c) => <option key={c} value={c}>{c}</option>)}
-                </select>
+              {/* 🏙️ SELETOR MÚLTIPLO DE CIDADES PARA A LOJA */}
+              <div style={{ display: "flex", flexDirection: "column", gap: 8, backgroundColor: "#F8FAFC", padding: "14px", borderRadius: "8px", border: "1px solid #CBD5E1" }}>
+                <label style={{ fontSize: 14, fontWeight: "bold", color: "#1E293B" }}>📍 Cidades atendidas por este estabelecimento:</label>
+                
+                <label style={{ display: "flex", alignItems: "center", gap: 8, fontSize: 14, fontWeight: "bold", color: "#0F4C81", cursor: "pointer", marginBottom: 4 }}>
+                  <input 
+                    type="checkbox" 
+                    checked={allCities} 
+                    onChange={(e) => setAllCities(e.target.checked)}
+                    style={{ width: 16, height: 16, accentColor: "#0F4C81", cursor: "pointer" }}
+                  />
+                  🌐 Atende em TODAS as cidades atuais e futuras
+                </label>
+                {!allCities && (
+                  <div style={{ display: "flex", flexDirection: "column", gap: 6, paddingLeft: 4, marginTop: 4 }}>
+                    <span style={{ fontSize: 12, color: "#64748B" }}>Ou selecione cidades específicas:</span>
+                    {CITIES_LIST.map((cityName) => (
+                      <label key={cityName} style={{ display: "flex", alignItems: "center", gap: 8, fontSize: 14, color: "#334155", cursor: "pointer" }}>
+                        <input 
+                          type="checkbox" 
+                          checked={selectedCities.includes(cityName)}
+                          onChange={() => handleCityToggle(cityName)}
+                          style={{ width: 15, height: 15, accentColor: "#0F4C81", cursor: "pointer" }}
+                        />
+                        {cityName}
+                      </label>
+                    ))}
+                  </div>
+                )}
               </div>
 
               <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 12 }}>
@@ -463,6 +513,19 @@ export default function ProfileDashboard() {
                     style={{ width: "100%", padding: 12, border: "1px solid #CBD5E1", borderRadius: 6, fontSize: 14 }} 
                   />
                 </div>
+              </div>
+
+              {/* 🛵 CAMPO DA TAXA DE ENTREGA */}
+              <div>
+                <label style={{ display: "block", fontSize: 13, fontWeight: "bold", marginBottom: 6 }}>Taxa de Entrega (R$):</label>
+                <input 
+                  type="text"
+                  placeholder="R$ 0,00"
+                  value={deliveryFeeDisplay}
+                  onChange={handleDeliveryFeeChange}
+                  style={{ width: "100%", padding: 12, border: "1px solid #CBD5E1", borderRadius: 6, fontSize: 14, fontWeight: "bold", color: "#0F4C81", boxSizing: "border-box" }}
+                />
+                <span style={{ fontSize: 11, color: "#64748B", marginTop: 4, display: "block" }}>Valor cobrado pelo delivery que será acrescido automaticamente no pedido.</span>
               </div>
 
               <div>
@@ -510,7 +573,7 @@ export default function ProfileDashboard() {
             <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(320px, 1fr))", gap: 30 }}>
               <form onSubmit={handleSaveProfile} style={{ display: "flex", flexDirection: "column", gap: 18 }}>
                 <h2 style={{ fontSize: 20, margin: 0, fontWeight: "bold", color: "#1E293B" }}>Aparência & Estilos</h2>
-
+                
                 <div>
                   <label style={{ display: "block", fontSize: 13, fontWeight: "bold", marginBottom: 8 }}>Cor do Tema da Vitrine:</label>
                   <div style={{ display: "grid", gridTemplateColumns: "repeat(6, 36px)", gap: 10, maxWidth: "100%" }}>
@@ -639,7 +702,6 @@ export default function ProfileDashboard() {
                           </div>
                         </div>
 
-                        {/* 🔹 Container de botões totalmente responsivo para telemóveis */}
                         <div style={{ display: "flex", gap: 6, flexShrink: 0, marginTop: 8, flexWrap: "wrap", width: "100%", justifyContent: "flex-start" }}>
                           {userType === "store" ? (
                             <>
@@ -687,7 +749,6 @@ export default function ProfileDashboard() {
                                   Anunciado nos Classificados
                                 </span>
                               )}
-
                               <button 
                                 onClick={() => handleMarkAsSold(ad.id, ad.title)}
                                 style={{ padding: "8px 12px", backgroundColor: "#DC2626", color: "#fff", border: "none", borderRadius: 6, fontSize: 12, fontWeight: "bold", cursor: "pointer", flex: "1 1 auto" }}
@@ -718,7 +779,6 @@ export default function ProfileDashboard() {
               )}
             </div>
           )}
-
         </div>
       </div>
     </main>
