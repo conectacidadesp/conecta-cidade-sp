@@ -1,4 +1,3 @@
-
 "use client";
 import { useEffect, useState, useRef, Suspense } from "react";
 import { useParams, useSearchParams } from "next/navigation";
@@ -437,6 +436,25 @@ function ShopContent() {
           box-shadow: 0 14px 32px rgba(0, 0, 0, 0.12) !important;
           border-color: ${theme.primary} !important;
         }
+        @media (max-width: 767px) {
+          .shop-main { padding-left: 12px !important; padding-right: 12px !important; }
+          .shop-product-grid {
+            grid-template-columns: repeat(2, minmax(0, 1fr)) !important;
+            gap: 12px !important;
+          }
+          .shop-product-card { min-width: 0; border-radius: 12px !important; }
+          .shop-product-card:hover { transform: none; }
+          .shop-product-image { height: auto !important; aspect-ratio: 1 / 1; padding: 6px !important; }
+          .shop-product-image img { max-width: 100%; max-height: 100%; object-fit: contain; }
+          .shop-product-info { padding: 10px !important; }
+          .shop-product-info h3 { font-size: 13px !important; line-height: 1.3 !important; height: 34px !important; }
+          .shop-product-info p { font-size: 11px !important; line-height: 1.3 !important; height: 29px !important; }
+          .shop-product-bottom { padding: 0 10px 10px !important; }
+          .shop-product-price { padding: 7px 8px !important; margin-bottom: 8px !important; gap: 4px; flex-wrap: wrap; }
+          .shop-product-price span:first-child { font-size: 9px !important; }
+          .shop-product-price span:last-child { font-size: 13px !important; overflow-wrap: anywhere; }
+          .shop-product-action { padding: 10px 5px !important; font-size: 11px !important; line-height: 1.3 !important; min-height: 42px; box-sizing: border-box; }
+        }
       `}</style>
 
       {profile?.banner_url && (
@@ -449,7 +467,7 @@ function ShopContent() {
         </div>
       )}
 
-      <main style={{ maxWidth: "1200px", margin: "0 auto", padding: "0 20px" }}>
+      <main className="shop-main" style={{ maxWidth: "1200px", margin: "0 auto", padding: "0 20px" }}>
         <div style={{
           display: "flex",
           flexWrap: "wrap",
@@ -543,7 +561,7 @@ function ShopContent() {
                     {items.length} {items.length === 1 ? "item" : "itens"}
                   </span>
                 </div>
-                <div style={{
+                <div className="shop-product-grid" style={{
                   display: "grid",
                   gridTemplateColumns: "repeat(auto-fill, minmax(230px, 1fr))",
                   gap: "20px"
@@ -566,7 +584,7 @@ function ShopContent() {
                       <div
                         key={`${ad.id}-${idx}`}
                         ref={isHighlighted && idx === 0 ? targetAdRef : null}
-                        className="modern-product-card"
+                        className="modern-product-card shop-product-card"
                         style={{
                           border: isHighlighted ? `3px solid ${theme.primary}` : `2px solid ${theme.primary}50`,
                           borderRadius: "16px",
@@ -586,13 +604,13 @@ function ShopContent() {
                         )}
                         <div>
                           {ad.image_url ? (
-                            <div style={{ width: "100%", height: "185px", backgroundColor: "#FFFFFF", display: "flex", alignItems: "center", justifyContent: "center", padding: 10, borderBottom: `1px solid ${theme.primary}25`, boxSizing: "border-box" }}>
+                            <div className="shop-product-image" style={{ width: "100%", height: "185px", backgroundColor: "#FFFFFF", display: "flex", alignItems: "center", justifyContent: "center", padding: 10, borderBottom: `1px solid ${theme.primary}25`, boxSizing: "border-box" }}>
                               <img src={ad.image_url} alt={ad.title} style={{ width: "100%", height: "100%", objectFit: "contain", objectPosition: "center" }} />
                             </div>
                           ) : (
-                            <div style={{ width: "100%", height: "185px", backgroundColor: "#FFFFFF", display: "flex", alignItems: "center", justifyContent: "center", color: "#94A3B8", fontSize: "13px", borderBottom: `1px solid ${theme.primary}25` }}>📷 Sem Foto</div>
+                            <div className="shop-product-image" style={{ width: "100%", height: "185px", backgroundColor: "#FFFFFF", display: "flex", alignItems: "center", justifyContent: "center", color: "#94A3B8", fontSize: "13px", borderBottom: `1px solid ${theme.primary}25` }}>📷 Sem Foto</div>
                           )}
-                          <div style={{ padding: "16px" }}>
+                          <div className="shop-product-info" style={{ padding: "16px" }}>
                             <h3 className="title-clamp" style={{ fontSize: "15px", fontWeight: "bold", margin: "0 0 6px 0", color: "#1E293B", lineHeight: "1.3", height: "39px" }}>
                               {ad.title}
                             </h3>
@@ -601,8 +619,8 @@ function ShopContent() {
                             </p>
                           </div>
                         </div>
-                        <div style={{ padding: "16px", paddingTop: 0 }}>
-                          <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: "12px", backgroundColor: `${theme.primary}15`, padding: "8px 12px", borderRadius: "10px", border: `1px solid ${theme.primary}35` }}>
+                        <div className="shop-product-bottom" style={{ padding: "16px", paddingTop: 0 }}>
+                          <div className="shop-product-price" style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: "12px", backgroundColor: `${theme.primary}15`, padding: "8px 12px", borderRadius: "10px", border: `1px solid ${theme.primary}35` }}>
                             <span style={{ fontSize: "11px", fontWeight: "bold", color: theme.primary, textTransform: "uppercase", letterSpacing: "0.5px" }}>Valor</span>
                             <span style={{ fontSize: "15px", fontWeight: "800", color: theme.primary }}>
                               {formattedPrice}
@@ -610,6 +628,7 @@ function ShopContent() {
                           </div>
                           {isFoodMode ? (
                             <button
+                              className="shop-product-action"
                               onClick={() => addToCart(ad)}
                               style={{
                                 width: "100%",
@@ -629,6 +648,7 @@ function ShopContent() {
                             </button>
                           ) : (
                             <a
+                              className="shop-product-action"
                               href={`https://wa.me/55${ad.whatsapp ? ad.whatsapp.replace(/\D/g, "") : ""}?text=${encodeURIComponent(marketMessage)}`}
                               target="_blank"
                               rel="noopener noreferrer"
