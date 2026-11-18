@@ -83,7 +83,6 @@ function PrintContent() {
 
         const dbOrder = result.order as DatabaseOrder;
 
-        // Consulta somente o nome público do estabelecimento.
         const profileResponse = await fetch(
           `/api/orders/store-name?storeId=${encodeURIComponent(
             dbOrder.store_id
@@ -200,150 +199,258 @@ function PrintContent() {
   }
 
   return (
-    <div
-      style={{
-        maxWidth: 380,
-        margin: "20px auto",
-        padding: 15,
-        fontFamily: "monospace",
-        backgroundColor: "#fff",
-        color: "#000",
-        border: "1px dashed #999",
-      }}
-    >
-      <div style={{ textAlign: "center", marginBottom: 15 }}>
-        <h2 style={{ margin: 0, fontSize: 18 }}>
-          {order.storeName}
-        </h2>
+    <>
+      <style jsx global>{`
+        @media print {
+          @page {
+            margin: 0;
+          }
 
-        <p
-          style={{
-            margin: "4px 0",
-            fontSize: 13,
-            fontWeight: "bold",
-          }}
-        >
-          PEDIDO {order.orderNumber}
-        </p>
+          html,
+          body {
+            margin: 0 !important;
+            padding: 0 !important;
+            background: #ffffff !important;
+          }
 
-        <p style={{ margin: 0, fontSize: 11 }}>
-          {order.date}
-        </p>
-      </div>
+          body * {
+            visibility: hidden !important;
+          }
 
-      <hr style={{ borderTop: "1px dashed #000" }} />
+          #conecta-print-receipt,
+          #conecta-print-receipt * {
+            visibility: visible !important;
+          }
 
-      <div style={{ fontSize: 12, margin: "10px 0" }}>
-        <p style={{ margin: "3px 0" }}>
-          <b>Cliente:</b> {order.customer}
-        </p>
+          #conecta-print-receipt {
+            position: absolute !important;
+            top: 0 !important;
+            left: 0 !important;
+            width: 80mm !important;
+            max-width: none !important;
+            margin: 0 !important;
+            padding: 3mm !important;
+            box-sizing: border-box !important;
+            border: none !important;
+            background: #ffffff !important;
+            color: #000000 !important;
+            box-shadow: none !important;
+          }
 
-        <p style={{ margin: "3px 0" }}>
-          <b>Tipo:</b> {order.deliveryType}
-        </p>
+          #conecta-print-receipt * {
+            box-sizing: border-box;
+          }
 
-        {order.address && (
-          <p style={{ margin: "3px 0" }}>
-            <b>Endereço:</b> {order.address}
-          </p>
-        )}
+          #conecta-print-receipt .print-hide,
+          #conecta-print-receipt .print-hide * {
+            display: none !important;
+            visibility: hidden !important;
+          }
 
-        <p style={{ margin: "3px 0" }}>
-          <b>Pagamento:</b> {order.payment}
-        </p>
+          #conecta-print-receipt p,
+          #conecta-print-receipt div,
+          #conecta-print-receipt span {
+            overflow-wrap: anywhere;
+          }
 
-        {order.notes && (
-          <p style={{ margin: "3px 0" }}>
-            <b>Obs:</b> {order.notes}
-          </p>
-        )}
-      </div>
+          #conecta-print-receipt .receipt-item {
+            break-inside: avoid;
+            page-break-inside: avoid;
+          }
 
-      <hr style={{ borderTop: "1px dashed #000" }} />
+          #conecta-print-receipt .receipt-brand-logo {
+            width: 15mm !important;
+            height: 15mm !important;
+          }
+        }
+      `}</style>
 
-      <div style={{ fontSize: 12, margin: "10px 0" }}>
-        <b>ITENS:</b>
-
-        {order.items.map((item, idx) => (
-          <div
-            key={idx}
+      <div
+        id="conecta-print-receipt"
+        style={{
+          maxWidth: 380,
+          margin: "20px auto",
+          padding: 15,
+          fontFamily: "monospace",
+          backgroundColor: "#fff",
+          color: "#000",
+          border: "1px dashed #999",
+        }}
+      >
+        <div style={{ textAlign: "center", marginBottom: 15 }}>
+          <img
+            src="/favicon.ico"
+            alt="Conecta Cidade SP"
+            className="receipt-brand-logo"
+            width={57}
+            height={57}
             style={{
-              display: "flex",
-              justifyContent: "space-between",
+              display: "block",
+              width: 57,
+              height: 57,
+              objectFit: "contain",
+              margin: "0 auto 8px",
+            }}
+          />
+
+          <h2 style={{ margin: 0, fontSize: 18 }}>
+            {order.storeName}
+          </h2>
+
+          <p
+            style={{
               margin: "4px 0",
+              fontSize: 13,
+              fontWeight: "bold",
             }}
           >
-            <span>
-              {item.qty}x {item.title}
-            </span>
+            PEDIDO {order.orderNumber}
+          </p>
 
-            <span>
-              {item.price !== null
-                ? `R$ ${(item.price * item.qty).toFixed(2)}`
-                : "A combinar"}
-            </span>
-          </div>
-        ))}
-      </div>
-
-      <hr style={{ borderTop: "1px dashed #000" }} />
-
-      <div style={{ fontSize: 13, margin: "10px 0" }}>
-        <div
-          style={{
-            display: "flex",
-            justifyContent: "space-between",
-          }}
-        >
-          <span>Subtotal:</span>
-          <span>R$ {order.subtotal}</span>
+          <p style={{ margin: 0, fontSize: 11 }}>
+            {order.date}
+          </p>
         </div>
 
-        {order.deliveryFee > 0 && (
+        <hr style={{ borderTop: "1px dashed #000" }} />
+
+        <div style={{ fontSize: 12, margin: "10px 0" }}>
+          <p style={{ margin: "3px 0" }}>
+            <b>Cliente:</b> {order.customer}
+          </p>
+
+          <p style={{ margin: "3px 0" }}>
+            <b>Tipo:</b> {order.deliveryType}
+          </p>
+
+          {order.address && (
+            <p style={{ margin: "3px 0" }}>
+              <b>Endereço:</b> {order.address}
+            </p>
+          )}
+
+          <p style={{ margin: "3px 0" }}>
+            <b>Pagamento:</b> {order.payment}
+          </p>
+
+          {order.notes && (
+            <p style={{ margin: "3px 0" }}>
+              <b>Obs:</b> {order.notes}
+            </p>
+          )}
+        </div>
+
+        <hr style={{ borderTop: "1px dashed #000" }} />
+
+        <div style={{ fontSize: 12, margin: "10px 0" }}>
+          <b>ITENS:</b>
+
+          {order.items.map((item, idx) => (
+            <div
+              key={idx}
+              className="receipt-item"
+              style={{
+                display: "flex",
+                justifyContent: "space-between",
+                alignItems: "flex-start",
+                gap: 8,
+                margin: "4px 0",
+              }}
+            >
+              <span style={{ flex: 1, minWidth: 0 }}>
+                {item.qty}x {item.title}
+              </span>
+
+              <span style={{ flexShrink: 0 }}>
+                {item.price !== null
+                  ? `R$ ${(item.price * item.qty).toFixed(2)}`
+                  : "A combinar"}
+              </span>
+            </div>
+          ))}
+        </div>
+
+        <hr style={{ borderTop: "1px dashed #000" }} />
+
+        <div style={{ fontSize: 13, margin: "10px 0" }}>
           <div
             style={{
               display: "flex",
               justifyContent: "space-between",
             }}
           >
-            <span>Taxa Entrega:</span>
-            <span>R$ {order.deliveryFee.toFixed(2)}</span>
+            <span>Subtotal:</span>
+            <span>R$ {order.subtotal}</span>
           </div>
-        )}
+
+          {order.deliveryFee > 0 && (
+            <div
+              style={{
+                display: "flex",
+                justifyContent: "space-between",
+              }}
+            >
+              <span>Taxa Entrega:</span>
+              <span>R$ {order.deliveryFee.toFixed(2)}</span>
+            </div>
+          )}
+
+          <div
+            style={{
+              display: "flex",
+              justifyContent: "space-between",
+              fontWeight: "bold",
+              fontSize: 15,
+              marginTop: 5,
+            }}
+          >
+            <span>TOTAL:</span>
+            <span>R$ {order.total}</span>
+          </div>
+        </div>
 
         <div
+          className="receipt-brand-footer"
           style={{
-            display: "flex",
-            justifyContent: "space-between",
-            fontWeight: "bold",
-            fontSize: 15,
-            marginTop: 5,
+            textAlign: "center",
+            marginTop: 18,
+            paddingTop: 8,
+            borderTop: "1px dashed #000",
+            fontSize: 10,
+            lineHeight: 1.5,
           }}
         >
-          <span>TOTAL:</span>
-          <span>R$ {order.total}</span>
+          <div>Pedido realizado via</div>
+          <div style={{ fontWeight: "bold" }}>
+            Conecta Cidade SP
+          </div>
+          <div>www.conectacidadesp.com.br</div>
+        </div>
+
+        <div
+          className="print-hide"
+          style={{ textAlign: "center", marginTop: 25 }}
+        >
+          <button
+            type="button"
+            onClick={() => window.print()}
+            style={{
+              width: "100%",
+              padding: 12,
+              backgroundColor: "#000",
+              color: "#fff",
+              border: "none",
+              fontWeight: "bold",
+              cursor: "pointer",
+              fontSize: 14,
+              borderRadius: 4,
+            }}
+          >
+            🖨️ IMPRIMIR COMANDA
+          </button>
         </div>
       </div>
-
-      <div style={{ textAlign: "center", marginTop: 25 }}>
-        <button
-          onClick={() => window.print()}
-          style={{
-            width: "100%",
-            padding: 12,
-            backgroundColor: "#000",
-            color: "#fff",
-            border: "none",
-            fontWeight: "bold",
-            cursor: "pointer",
-            fontSize: 14,
-            borderRadius: 4,
-          }}
-        >
-          🖨️ IMPRIMIR COMANDA
-        </button>
-      </div>
-    </div>
+    </>
   );
 }
 
