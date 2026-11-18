@@ -50,7 +50,7 @@ const THEME_OPTIONS = [
 export default function ProfileDashboard() {
   const [userType, setUserType] = useState<"store" | "client">("store");
   const [activeTab, setActiveTab] = useState<"perfil" | "vitrine" | "anuncios">("perfil");
-  
+
   // Dados Básicos da Loja
   const [storeName, setStoreName] = useState("");
   const [city, setCity] = useState("Rubiácea-SP");
@@ -63,7 +63,7 @@ export default function ProfileDashboard() {
   const [rawDeliveryFee, setRawDeliveryFee] = useState<number | null>(0); 
   const [currentLogoUrl, setCurrentLogoUrl] = useState<string | null>(null);
   const [logoFile, setLogoFile] = useState<File | null>(null);
-  
+
   // Horários e Criação
   const [openTime, setOpenTime] = useState("08:00");
   const [closeTime, setCloseTime] = useState("18:00");
@@ -81,17 +81,18 @@ export default function ProfileDashboard() {
   const [loading, setLoading] = useState(false);
   const [fetching, setFetching] = useState(true);
   const [user, setUser] = useState<any>(null);
+  const [updatingVisibilityId, setUpdatingVisibilityId] = useState<string | null>(null);
 
   useEffect(() => {
     async function loadDashboardData() {
       const { data: { user } } = await supabase.auth.getUser();
-      
+
       if (!user) {
         alert("Aviso: Você precisa estar logado para acessar seu painel.");
         window.location.href = "/";
         return;
       }
-      
+
       setUser(user);
       const { data: profileData } = await supabase
         .from("profiles")
@@ -105,9 +106,9 @@ export default function ProfileDashboard() {
         user.email?.endsWith("@client.conectacidade.local") || 
         user.phone || 
         profileData?.user_type === "client";
-      
+
       const type = isClientUser ? "client" : (profileData?.user_type || "store");
-      
+
       setUserType(type);
       if (type === "client") {
         setActiveTab("anuncios");
@@ -120,7 +121,7 @@ export default function ProfileDashboard() {
         setBio(profileData.bio || "");
         setWhatsapp(profileData.whatsapp || "");
         setStoreType(profileData.store_type || "marketplace");
-        
+
         if (profileData.delivery_fee !== null && profileData.delivery_fee !== undefined) {
           setRawDeliveryFee(profileData.delivery_fee);
           setDeliveryFeeDisplay(profileData.delivery_fee.toLocaleString("pt-BR", { style: "currency", currency: "BRL" }));
@@ -134,7 +135,7 @@ export default function ProfileDashboard() {
         setBannerUrl(profileData.banner_url || null);
         setOpenTime(profileData.open_time || "08:00");
         setCloseTime(profileData.close_time || "18:00");
-        
+
         if (profileData.created_at) {
           const dateObj = new Date(profileData.created_at);
           setCreatedAtDate(dateObj.toLocaleDateString("pt-BR"));
@@ -166,7 +167,7 @@ export default function ProfileDashboard() {
       } else {
         setMyAds([]);
       }
-      
+
       setLoadingAds(false);
       setFetching(false);
     }
@@ -318,6 +319,39 @@ export default function ProfileDashboard() {
     }
   };
 
+  // Controle independente de visibilidade na vitrine pública
+  const handleToggleVitrine = async (adId: string, currentHidden: boolean) => {
+    if (!user || updatingVisibilityId !== null) return;
+
+    const newHidden = !currentHidden;
+    setUpdatingVisibilityId(adId);
+
+    try {
+      const { data, error } = await supabase
+        .from("ads")
+        .update({ is_hidden: newHidden })
+        .eq("id", adId)
+        .eq("user_id", user.id)
+        .select("id, is_hidden")
+        .single();
+
+      if (error) throw error;
+
+      setMyAds(prev => prev.map(ad =>
+        ad.id === data.id
+          ? { ...ad, is_hidden: data.is_hidden }
+          : ad
+      ));
+    } catch (error) {
+      alert(
+        "Erro ao atualizar a visibilidade do produto: " +
+        (error instanceof Error ? error.message : "Tente novamente.")
+      );
+    } finally {
+      setUpdatingVisibilityId(null);
+    }
+  };
+
   const handleToggleClassificados = async (adId: string, currentState: boolean) => {
     const newState = !currentState;
     const updatePayload: any = { show_in_classificados: newState };
@@ -379,7 +413,7 @@ export default function ProfileDashboard() {
 
   return (
     <main style={{ padding: "20px 10px", maxWidth: 1100, margin: "0 auto", fontFamily: "sans-serif", backgroundColor: "#F8FAFC", minHeight: "100vh" }}>
-      
+
       <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 20 }}>
         <button 
           onClick={() => window.location.href = "/"}
@@ -398,7 +432,7 @@ export default function ProfileDashboard() {
       </div>
 
       <div style={{ border: "1px solid #E2E8F0", borderRadius: 12, backgroundColor: "#fff", boxShadow: "0 4px 12px rgba(0,0,0,0.05)", overflow: "hidden" }}>
-        
+
         {userType === "store" ? (
           <div style={{ display: "flex", borderBottom: "1px solid #E2E8F0", backgroundColor: "#F1F5F9" }}>
             <button
@@ -444,7 +478,7 @@ export default function ProfileDashboard() {
           {userType === "store" && activeTab === "perfil" && (
             <form onSubmit={handleSaveProfile} style={{ display: "flex", flexDirection: "column", gap: 18, maxWidth: 600 }}>
               <h2 style={{ fontSize: 20, margin: 0, fontWeight: "bold", color: "#1E293B" }}>Identidade do Comércio</h2>
-              
+
               <div>
                 <label style={{ display: "block", fontSize: 13, fontWeight: "bold", marginBottom: 6 }}>Nome Fantasia:</label>
                 <input 
@@ -469,7 +503,7 @@ export default function ProfileDashboard() {
 
               <div style={{ display: "flex", flexDirection: "column", gap: 8, backgroundColor: "#F8FAFC", padding: "14px", borderRadius: "8px", border: "1px solid #CBD5E1" }}>
                 <label style={{ fontSize: 14, fontWeight: "bold", color: "#1E293B" }}>📍 Cidades atendidas por este estabelecimento:</label>
-                
+
                 <label style={{ display: "flex", alignItems: "center", gap: 8, fontSize: 14, fontWeight: "bold", color: "#0F4C81", cursor: "pointer", marginBottom: 4 }}>
                   <input 
                     type="checkbox" 
@@ -575,7 +609,7 @@ export default function ProfileDashboard() {
             <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(320px, 1fr))", gap: 30 }}>
               <form onSubmit={handleSaveProfile} style={{ display: "flex", flexDirection: "column", gap: 18 }}>
                 <h2 style={{ fontSize: 20, margin: 0, fontWeight: "bold", color: "#1E293B" }}>Aparência & Estilos</h2>
-                
+
                 <div>
                   <label style={{ display: "block", fontSize: 13, fontWeight: "bold", marginBottom: 8 }}>Cor do Tema da Vitrine:</label>
                   <div style={{ display: "grid", gridTemplateColumns: "repeat(6, 36px)", gap: 10, maxWidth: "100%" }}>
@@ -685,7 +719,7 @@ export default function ProfileDashboard() {
 
                     return (
                       <div key={ad.id} style={{ display: "flex", flexDirection: "column", gap: 10, padding: 12, border: "1px solid #E2E8F0", borderRadius: 8, opacity: ad.is_hidden ? 0.6 : 1, backgroundColor: ad.is_hidden ? "#F8FAFC" : "#fff" }}>
-                        
+
                         <div style={{ display: "flex", gap: 15, alignItems: "center", justifyContent: "space-between", flexWrap: "wrap" }}>
                           <div style={{ display: "flex", gap: 12, alignItems: "center", flex: 1, minWidth: 200 }}>
                             {ad.image_url ? (
@@ -801,6 +835,35 @@ export default function ProfileDashboard() {
                               </button>
                             </>
                           )}
+
+                          {/* Botão de visibilidade exclusivo do lojista */}
+                          {userType === "store" && (
+                            <button
+                              type="button"
+                              onClick={() => handleToggleVitrine(ad.id, !!ad.is_hidden)}
+                              disabled={updatingVisibilityId !== null}
+                              title={ad.is_hidden ? "Exibir produto na vitrine pública" : "Ocultar produto da vitrine pública"}
+                              style={{
+                                padding: "8px 12px",
+                                backgroundColor: ad.is_hidden ? "#16A34A" : "#475569",
+                                color: "#fff",
+                                border: "none",
+                                borderRadius: 6,
+                                fontSize: 12,
+                                fontWeight: "bold",
+                                cursor: updatingVisibilityId !== null ? "wait" : "pointer",
+                                opacity: updatingVisibilityId !== null ? 0.7 : 1,
+                                flex: "1 1 auto"
+                              }}
+                            >
+                              {updatingVisibilityId === ad.id
+                                ? "Salvando..."
+                                : ad.is_hidden
+                                  ? "👁️ Adicionar à Vitrine"
+                                  : "🙈 Ocultar da Vitrine"}
+                            </button>
+                          )}
+
                           <button 
                             onClick={() => window.location.href = `/edit-ad/${ad.id}`}
                             style={{ padding: "8px 12px", backgroundColor: "#E2E8F0", color: "#1E293B", border: "none", borderRadius: 6, fontSize: 12, fontWeight: "bold", cursor: "pointer", flex: "1 1 auto" }}
