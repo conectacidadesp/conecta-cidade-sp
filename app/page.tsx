@@ -1,3 +1,4 @@
+
 "use client";
 import { useState, useEffect } from "react";
 import { useRouter } from "next/navigation";
@@ -63,10 +64,10 @@ export default function Home() {
   const [reportReason, setReportReason] = useState("Conteúdo impróprio / Proibido");
   const [reportDetails, setReportDetails] = useState("");
   const [submittingReport, setSubmittingReport] = useState(false);
-  
+
   // 🔍 Estado para visualização de imagem em tela cheia (Zoom)
   const [previewImage, setPreviewImage] = useState<string | null>(null);
-  
+
   // 📖 Estado para controlar descrições expandidas no feed
   const [expandedDescriptions, setExpandedDescriptions] = useState<{ [key: string]: boolean }>({});
 
@@ -247,6 +248,15 @@ export default function Home() {
     const storeBanner = profile.banner_url;
     const storeBio = profile.bio && profile.bio !== "EMPTY" ? profile.bio : "Estabelecimento cadastrado no Conecta Cidade SP.";
 
+    // 📖 Ver mais / Ver menos exclusivo para a descrição do Comércio Local
+    const MAX_BIO_LENGTH = 90;
+    const bioKey = `profile-${profile.id}`;
+    const isBioExpanded = expandedDescriptions[bioKey] || false;
+    const hasLongBio = storeBio.length > MAX_BIO_LENGTH;
+    const displayBio = !isBioExpanded && hasLongBio
+      ? storeBio.substring(0, MAX_BIO_LENGTH).trimEnd() + "..."
+      : storeBio;
+
     return (
       <div
         key={profile.id}
@@ -289,7 +299,16 @@ export default function Home() {
             <p style={{ fontSize: 12, color: "#64748B", margin: "0 0 10px" }}>
               📍 {profile.all_cities ? "Todas as cidades" : profile.city || selectedCity}
             </p>
-            <p style={{ fontSize: 13, color: "#334155", margin: "0 0 10px 0", lineHeight: "1.4" }}>{storeBio}</p>
+            <p style={{ fontSize: 13, color: "#334155", margin: "0 0 4px 0", lineHeight: "1.4" }}>{displayBio}</p>
+            {hasLongBio && (
+              <button
+                type="button"
+                onClick={() => setExpandedDescriptions(prev => ({ ...prev, [bioKey]: !isBioExpanded }))}
+                style={{ background: "none", border: "none", color: "#0088FF", fontSize: 11, fontWeight: "bold", cursor: "pointer", padding: 0, marginBottom: 8 }}
+              >
+                {isBioExpanded ? "▲ Ver menos" : "▼ Ver mais"}
+              </button>
+            )}
           </div>
           <div style={{ marginTop: 16, display: "flex", flexDirection: "column", gap: 8 }}>
             <a
@@ -317,22 +336,22 @@ export default function Home() {
   const renderAdCard = (ad: Ad) => {
     const storeProfile = ad.user_id ? profilesMap[ad.user_id] : null;
     const storeNameRaw = storeProfile ? storeProfile.store_name || storeProfile.name || "" : "";
-    
+
     const isRealStore =
       storeProfile &&
       storeProfile.user_type !== "client" &&
       !storeNameRaw.toLowerCase().startsWith("anunciante") &&
       storeNameRaw.trim() !== "";
-      
+
     const storeName = isRealStore ? storeNameRaw : null;
     const isFoodStore = storeProfile?.store_type === "food";
-    
+
     // 👤 Pega o advertiser_name ou o nome do perfil de usuário comum / cliente
     const hasCustomAdvertiser = ad.advertiser_name && ad.advertiser_name.trim() !== "";
     const clientUserName = storeProfile && storeProfile.name ? storeProfile.name : "";
-    
-    const commonAdvertiserName = hasCustomAdvertiser 
-      ? ad.advertiser_name 
+
+    const commonAdvertiserName = hasCustomAdvertiser
+      ? ad.advertiser_name
       : (!storeName && clientUserName ? clientUserName : null);
 
     const formattedPrice = ad.price ? `R$ ${ad.price.toFixed(2)}` : "A combinar";
@@ -349,8 +368,8 @@ export default function Home() {
     const MAX_DESC_LENGTH = 65;
     const isExpanded = expandedDescriptions[ad.id] || false;
     const hasLongDescription = ad.description && ad.description.length > MAX_DESC_LENGTH;
-    const displayDescription = !isExpanded && hasLongDescription 
-      ? ad.description.substring(0, MAX_DESC_LENGTH) + "..." 
+    const displayDescription = !isExpanded && hasLongDescription
+      ? ad.description.substring(0, MAX_DESC_LENGTH) + "..."
       : ad.description;
 
     return (
