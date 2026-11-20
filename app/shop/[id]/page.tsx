@@ -1,3 +1,4 @@
+
 "use client";
 import { useEffect, useState, useRef, Suspense } from "react";
 import { useParams, useSearchParams } from "next/navigation";
@@ -81,22 +82,42 @@ const formatCurrencyInput = (value: string) => {
   return numberValue.toLocaleString("pt-BR", { style: "currency", currency: "BRL" });
 };
 
-function checkIsOpen(openTime?: string, closeTime?: string) {
+// Verifica o funcionamento considerando o horário de Brasília e a virada do dia.
+function checkIsOpen(openTime?: string, closeTime?: string, now = new Date()) {
   if (!openTime || !closeTime) return true;
-  const now = new Date();
-  const formatter = new Intl.DateTimeFormat('en-US', {
-    timeZone: 'America/Sao_Paulo',
-    hour: 'numeric',
-    minute: 'numeric',
-    hour12: false,
-  });
-  const parts = formatter.formatToParts(now);
-  const hours = parts.find((p) => p.type === "hour")?.value || "00";
-  const minutes = parts.find((p) => p.type === "minute")?.value || "00";
 
-  const normalizedHours = hours === "24" ? "00" : hours.padStart(2, "0");
-  const currentTime = `${normalizedHours}:${minutes.padStart(2, "0")}`;
-  return currentTime >= openTime && currentTime <= closeTime;
+  const parseTime = (value: string) => {
+    const match = value.match(/^(\d{1,2}):(\d{2})(?::\d{2})?$/);
+    if (!match) return null;
+    const hours = Number(match[1]);
+    const minutes = Number(match[2]);
+    if (hours > 23 || minutes > 59) return null;
+    return hours * 60 + minutes;
+  };
+
+  const opening = parseTime(openTime);
+  const closing = parseTime(closeTime);
+
+  if (opening === null || closing === null) return false;
+
+  const parts = new Intl.DateTimeFormat("en-US", {
+    timeZone: "America/Sao_Paulo",
+    hour: "2-digit",
+    minute: "2-digit",
+    hourCycle: "h23",
+  }).formatToParts(now);
+
+  const hours = Number(parts.find((part) => part.type === "hour")?.value ?? "0") % 24;
+  const minutes = Number(parts.find((part) => part.type === "minute")?.value ?? "0");
+  const current = hours * 60 + minutes;
+
+  if (opening === closing) return true;
+
+  if (closing > opening) {
+    return current >= opening && current < closing;
+  }
+
+  return current >= opening || current < closing;
 }
 
 function ShopContent() {
@@ -111,6 +132,19 @@ function ShopContent() {
   const [loading, setLoading] = useState(true);
 
   const [selectedTabCategory, setSelectedTabCategory] = useState("Todos");
+
+  // Atualiza o status da loja automaticamente.
+  const [currentTime, setCurrentTime] = useState(() => new Date());
+
+  useEffect(() => {
+    const updateTime = () => setCurrentTime(new Date());
+    const interval = window.setInterval(updateTime, 30000);
+    window.addEventListener("focus", updateTime);
+    return () => {
+      window.clearInterval(interval);
+      window.removeEventListener("focus", updateTime);
+    };
+  }, []);
 
   // Estados do Carrinho & Endereço
   const [cart, setCart] = useState<CartItem[]>([]);
@@ -200,7 +234,18 @@ function ShopContent() {
   const rawFontKey = profile?.font_style || "sans";
   const activeFontFamily = FONT_FAMILIES[rawFontKey] || FONT_FAMILIES.sans;
   const isFoodMode = profile?.store_type === "food";
-  const isOpen = checkIsOpen(profile?.open_time, profile?.close_time);
+  const isOpen = checkIsOpen(profile?.open_time, profile?.close_time, currentTime);
+
+  const storeCreatedDate = profile?.created_at
+    ? new Date(profile.created_at)
+    : null;
+
+  const formattedStoreCreatedDate =
+    storeCreatedDate && !Number.isNaN(storeCreatedDate.getTime())
+      ? storeCreatedDate.toLocaleDateString("pt-BR", {
+          timeZone: "America/Sao_Paulo",
+        })
+      : null;
 
   const addToCart = (ad: Ad) => {
     setCart((prev) => {
@@ -514,6 +559,18 @@ function ShopContent() {
                   ({profile?.open_time || "08:00"} às {profile?.close_time || "18:00"})
                 </span>
               </div>
+
+              {formattedStoreCreatedDate && (
+                <div style={{
+                  color: theme.text,
+                  fontSize: "12px",
+                  marginTop: "8px",
+                  opacity: 0.85,
+                  lineHeight: "1.4"
+                }}>
+                  🛡️ Loja na Conecta Cidade SP desde: <strong>{formattedStoreCreatedDate}</strong>
+                </div>
+              )}
             </div>
           </div>
           <span style={{ backgroundColor: theme.primary, color: "#fff", fontSize: "12px", fontWeight: "bold", padding: "8px 14px", borderRadius: "20px", boxShadow: "0 2px 8px rgba(0,0,0,0.15)", whiteSpace: "nowrap" }}>

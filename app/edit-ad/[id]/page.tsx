@@ -1,3 +1,4 @@
+
 "use client";
 import { useEffect, useState } from "react";
 import { supabase } from "@/lib/supabase";
@@ -7,6 +8,43 @@ const CITIES_LIST = [
   "Rubiácea-SP",
   "Guararapes-SP",
 ];
+
+// 📸 Otimização WebP: imagem quadrada 800x800, fundo branco, sem cortes.
+const compressAndResizeImage = (file: File, targetSize = 800, quality = 0.82): Promise<Blob> => {
+  return new Promise((resolve, reject) => {
+    const img = new Image();
+    const objectUrl = URL.createObjectURL(file);
+    img.onload = () => {
+      const canvas = document.createElement("canvas");
+      canvas.width = targetSize;
+      canvas.height = targetSize;
+      const ctx = canvas.getContext("2d");
+      if (!ctx) {
+        URL.revokeObjectURL(objectUrl);
+        reject(new Error("Erro ao processar imagem no navegador."));
+        return;
+      }
+      ctx.fillStyle = "#FFFFFF";
+      ctx.fillRect(0, 0, targetSize, targetSize);
+      const scale = Math.min(targetSize / img.width, targetSize / img.height);
+      const renderWidth = img.width * scale;
+      const renderHeight = img.height * scale;
+      ctx.imageSmoothingEnabled = true;
+      ctx.imageSmoothingQuality = "high";
+      ctx.drawImage(img, (targetSize - renderWidth) / 2, (targetSize - renderHeight) / 2, renderWidth, renderHeight);
+      URL.revokeObjectURL(objectUrl);
+      canvas.toBlob((blob) => {
+        if (blob && blob.type === "image/webp") resolve(blob);
+        else reject(new Error("Falha ao converter a imagem para WebP."));
+      }, "image/webp", quality);
+    };
+    img.onerror = () => {
+      URL.revokeObjectURL(objectUrl);
+      reject(new Error("Não foi possível carregar a imagem."));
+    };
+    img.src = objectUrl;
+  });
+};
 
 export default function EditAdPage() {
   const router = useRouter();
@@ -164,26 +202,32 @@ export default function EditAdPage() {
 
     let finalImageUrl = imageUrl;
 
-    // 📤 Se o usuário escolheu uma nova imagem da galeria/computador, faz o upload no Supabase Storage
+    // 📤 Otimiza a nova imagem em WebP antes do upload no Supabase Storage
     if (imageFile) {
-      const fileExt = imageFile.name.split(".").pop();
-      const fileName = `public/${Date.now()}-${Math.random().toString(36).substring(2)}.${fileExt}`;
+      try {
+        const compressedBlob = await compressAndResizeImage(imageFile, 800, 0.82);
+        const fileName = `public/${Date.now()}-${Math.random().toString(36).substring(2)}.webp`;
 
-      const { error: uploadError } = await supabase.storage
-        .from("ads-images")
-        .upload(fileName, imageFile);
+        const { error: uploadError } = await supabase.storage
+          .from("ads-images")
+          .upload(fileName, compressedBlob, { contentType: "image/webp" });
 
-      if (uploadError) {
-        alert("Erro ao enviar a nova foto: " + uploadError.message);
+        if (uploadError) {
+          alert("Erro ao enviar a nova foto: " + uploadError.message);
+          setSaving(false);
+          return;
+        }
+
+        const { data: publicUrlData } = supabase.storage
+          .from("ads-images")
+          .getPublicUrl(fileName);
+
+        finalImageUrl = publicUrlData.publicUrl;
+      } catch (err: unknown) {
+        alert("Erro ao otimizar a imagem: " + (err instanceof Error ? err.message : "Erro desconhecido"));
         setSaving(false);
         return;
       }
-
-      const { data: publicUrlData } = supabase.storage
-        .from("ads-images")
-        .getPublicUrl(fileName);
-
-      finalImageUrl = publicUrlData.publicUrl;
     }
 
     const { error } = await supabase

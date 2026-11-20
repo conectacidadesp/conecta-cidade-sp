@@ -1,3 +1,4 @@
+
 "use client";
 import { useState, useEffect } from "react";
 import { supabase } from "@/lib/supabase";
@@ -58,7 +59,7 @@ const categoriesData: Record<string, { icon: string; subs: string[] }> = {
 };
 
 // ⚡ Otimizador Inteligente: Converte e redimensiona para Quadrado Perfeito (800x800px)
-const compressAndResizeImage = (file: File, targetSize = 800, quality = 0.8): Promise<Blob> => {
+const compressAndResizeImage = (file: File, targetSize = 800, quality = 0.82): Promise<Blob> => {
   return new Promise((resolve, reject) => {
     const img = new Image();
     img.src = URL.createObjectURL(file);
@@ -94,7 +95,7 @@ const compressAndResizeImage = (file: File, targetSize = 800, quality = 0.8): Pr
             reject(new Error("Falha na compactação da imagem."));
           }
         },
-        "image/jpeg",
+        "image/webp",
         quality
       );
     };
@@ -286,13 +287,13 @@ export default function CreateAd() {
     let uploadedImageUrl = "";
     if (imageFile) {
       try {
-        const compressedBlob = await compressAndResizeImage(imageFile, 800, 0.8);
-        const fileName = `${loggedUserId}-${Date.now()}.jpg`;
+        const compressedBlob = await compressAndResizeImage(imageFile, 800, 0.82);
+        const fileName = `${loggedUserId}-${Date.now()}.webp`;
         const filePath = `public/${fileName}`;
         const { error: uploadError } = await supabase.storage
           .from("ads-images")
           .upload(filePath, compressedBlob, {
-            contentType: "image/jpeg",
+            contentType: "image/webp",
             upsert: true
           });
         if (uploadError) {

@@ -1,3 +1,4 @@
+
 "use client";
 import { useEffect, useState } from "react";
 import { supabase } from "@/lib/supabase";
@@ -46,6 +47,52 @@ const THEME_OPTIONS = [
   { id: "slate", name: "Cinza Chumbo", color: "#475569" },
   { id: "black", name: "Preto Clássico", color: "#0F172A" },
 ];
+
+// Otimiza imagens antes do upload, sem ampliar fotos pequenas.
+// GIFs animados e SVGs são preservados para não perder animação ou conteúdo vetorial.
+async function optimizeImageForUpload(file: File, maxDimension: number): Promise<File> {
+  if (!file.type.startsWith("image/") || file.type === "image/gif" || file.type === "image/svg+xml") {
+    return file;
+  }
+
+  try {
+    const bitmap = await createImageBitmap(file, { imageOrientation: "from-image" });
+    const scale = Math.min(1, maxDimension / Math.max(bitmap.width, bitmap.height));
+    const width = Math.max(1, Math.round(bitmap.width * scale));
+    const height = Math.max(1, Math.round(bitmap.height * scale));
+    const canvas = document.createElement("canvas");
+    canvas.width = width;
+    canvas.height = height;
+    const context = canvas.getContext("2d");
+    if (!context) {
+      bitmap.close();
+      return file;
+    }
+    context.imageSmoothingEnabled = true;
+    context.imageSmoothingQuality = "high";
+    context.drawImage(bitmap, 0, 0, width, height);
+    bitmap.close();
+
+    const compressed = await new Promise<Blob | null>((resolve) => {
+      canvas.toBlob(resolve, "image/webp", 0.82);
+    });
+    canvas.width = 0;
+    canvas.height = 0;
+
+    // Se o navegador não oferecer WebP ou o resultado for maior, preserva o original.
+    if (!compressed || compressed.type !== "image/webp" || compressed.size >= file.size) {
+      return file;
+    }
+    const baseName = file.name.replace(/\.[^.]+$/, "");
+    return new File([compressed], `${baseName}.webp`, {
+      type: "image/webp",
+      lastModified: Date.now(),
+    });
+  } catch (error) {
+    console.warn("Não foi possível otimizar a imagem; original preservado:", error);
+    return file;
+  }
+}
 
 export default function ProfileDashboard() {
   const [userType, setUserType] = useState<"store" | "client">("store");
@@ -233,29 +280,41 @@ export default function ProfileDashboard() {
     setLoading(true);
     let uploadedLogoUrl = currentLogoUrl || "";
     let uploadedBannerUrl = bannerUrl || "";
-    if (logoFile) {
-      const fileExt = logoFile.name.split('.').pop();
-      const fileName = `${user.id}-logo-${Math.random()}.${fileExt}`;
-      const filePath = `logos/${fileName}`;
-      const { error: uploadError } = await supabase.storage
-        .from("ads-images")
-        .upload(filePath, logoFile, { upsert: true });
-      if (!uploadError) {
+    try {
+      if (logoFile) {
+        const optimizedLogo = await optimizeImageForUpload(logoFile, 640);
+        const fileExt = optimizedLogo.name.split(".").pop() || "jpg";
+        const fileName = `${user.id}-logo-${Math.random()}.${fileExt}`;
+        const filePath = `logos/${fileName}`;
+        const { error: uploadError } = await supabase.storage
+          .from("ads-images")
+          .upload(filePath, optimizedLogo, {
+            upsert: true,
+            contentType: optimizedLogo.type || undefined,
+          });
+        if (uploadError) throw uploadError;
         const { data } = supabase.storage.from("ads-images").getPublicUrl(filePath);
         uploadedLogoUrl = data.publicUrl;
       }
-    }
-    if (bannerFile) {
-      const fileExt = bannerFile.name.split('.').pop();
-      const fileName = `${user.id}-banner-${Math.random()}.${fileExt}`;
-      const filePath = `banners/${fileName}`;
-      const { error: uploadError } = await supabase.storage
-        .from("ads-images")
-        .upload(filePath, bannerFile, { upsert: true });
-      if (!uploadError) {
+      if (bannerFile) {
+        const optimizedBanner = await optimizeImageForUpload(bannerFile, 1920);
+        const fileExt = optimizedBanner.name.split(".").pop() || "jpg";
+        const fileName = `${user.id}-banner-${Math.random()}.${fileExt}`;
+        const filePath = `banners/${fileName}`;
+        const { error: uploadError } = await supabase.storage
+          .from("ads-images")
+          .upload(filePath, optimizedBanner, {
+            upsert: true,
+            contentType: optimizedBanner.type || undefined,
+          });
+        if (uploadError) throw uploadError;
         const { data } = supabase.storage.from("ads-images").getPublicUrl(filePath);
         uploadedBannerUrl = data.publicUrl;
       }
+    } catch (uploadError) {
+      setLoading(false);
+      alert("Erro ao enviar imagem: " + (uploadError instanceof Error ? uploadError.message : "Tente novamente."));
+      return;
     }
     const isClientUser = 
       user.email?.includes("@anunciante.com") || 
